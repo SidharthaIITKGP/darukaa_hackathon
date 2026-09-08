@@ -1,0 +1,208 @@
+# Citation registry. Every causal edge and every retrieved chunk carries a
+# source_id from this file. Never emit a citation that isn't registered here.
+#
+# tier:      assessment | meta_analysis | database | model_output
+# strength:  meta_analysis > multi_site > single_site > mechanistic > expert
+# scope:     where the evidence is valid. Used to flag extrapolation when a
+#            site falls outside it.
+
+sources:
+
+  IPCC_2019_SRCCL_Ch6:
+    file: data/corpus/assessments/IPCC_2019_SRCCL_Ch6_response_options.pdf
+    tier: assessment
+    strength: assessment
+    citation: "IPCC (2019), Special Report on Climate Change and Land, Ch. 6: Interlinkages between desertification, land degradation, food security and GHG fluxes"
+    url: https://www.ipcc.ch/srccl/chapter/chapter-6/
+    scope: global
+    notes: >
+      Response-option tables give direction, feasibility, co-benefits and
+      adverse side effects per intervention. Best source for TRADEOFFS.
+      Deliberately avoids point estimates - do not mine for effect sizes.
+
+  IPCC_2022_AR6_WG3_Ch7:
+    file: data/corpus/assessments/IPCC_2022_AR6_WG3_Ch7_AFOLU.pdf
+    tier: assessment
+    strength: assessment
+    citation: "IPCC (2022), AR6 WGIII, Ch. 7: Agriculture, Forestry and Other Land Uses (AFOLU)"
+    url: https://www.ipcc.ch/report/ar6/wg3/
+    scope: global
+
+  IPBES_2018_LDR:
+    file: data/corpus/assessments/IPBES_2018_land_degradation_spm.pdf
+    tier: assessment
+    strength: assessment
+    citation: "IPBES (2018), Summary for Policymakers, Assessment Report on Land Degradation and Restoration"
+    url: https://www.ipbes.net/assessment-reports
+    scope: global
+
+  FAO_2020_soil_biodiversity:
+    file: data/corpus/assessments/FAO_2020_soil_biodiversity.pdf
+    tier: assessment
+    strength: assessment
+    citation: "FAO et al. (2020), State of Knowledge of Soil Biodiversity"
+    scope: global
+    notes: Primary source for soil-biota mechanism chains.
+
+  FAO_2022_GSOCseq:
+    file: data/corpus/assessments/FAO_2022_GSOCseq_technical_report.pdf
+    tier: model_output
+    strength: multi_site
+    citation: "FAO (2022), Global Soil Organic Carbon Sequestration Potential Map (GSOCseq v1.1), Technical Report"
+    scope: global agricultural land, 0-30 cm
+    notes: >
+      SSM scenarios = carbon input increase over BAU: SSM1 +5%, SSM2 +10%,
+      SSM3 +20%. Paired uncertainty rasters available. Use for spatially
+      explicit SOC sequestration rates.
+
+  FAO_2017_VGSSM:
+    file: data/corpus/assessments/FAO_2017_VGSSM.pdf
+    tier: assessment
+    strength: assessment
+    citation: "FAO (2017), Voluntary Guidelines for Sustainable Soil Management"
+    scope: global
+
+  Joshi_2023_covercrops_SOC:
+    file: data/corpus/meta_analyses/Joshi_2023_covercrops_SOC_corn.pdf
+    tier: meta_analysis
+    strength: meta_analysis
+    citation: "Joshi, D.R. et al. (2023), A global meta-analysis of cover crop response on soil carbon storage within a corn production system, Agronomy Journal 115(4)"
+    doi: 10.1002/agj2.21340
+    n_studies: 61
+    scope: corn rotations, global, mostly temperate
+    key_estimates:
+      - metric: soil_organic_carbon
+        effect: "+7.3%"
+        ci95: [0.049, 0.096]
+        note: pooled estimate across all depths and tillage
+      - metric: soil_organic_carbon
+        effect: "+8.6% to +33.7%"
+        note: "0-15 cm under CONVENTIONAL tillage only (subgroup, n=7, low confidence)"
+      - metric: soil_organic_carbon
+        effect: "+0.3% to +10.5%"
+        note: "0-15 cm under NO-TILLAGE (subgroup)"
+    moderators: [soil_texture, tillage_type, cover_crop_growth, years_under_management, climate]
+
+  McClelland_2020_covercrops_SOC:
+    file: data/corpus/meta_analyses/McClelland_2020_covercrops_SOC_temperate.pdf
+    tier: meta_analysis
+    strength: meta_analysis
+    citation: "McClelland, S.C., Paustian, K. & Schipanski, M.E. (2021), Management of cover crops in temperate climates influences soil organic carbon stocks: a meta-analysis, Ecological Applications 31(3):e02278"
+    doi: 10.1002/eap.2278
+    n_studies: 40
+    n_observations: 181
+    scope: temperate climates, 0-30 cm, 6 countries
+    key_estimates:
+      - metric: soil_organic_carbon
+        effect: "+12%"
+        absolute: "+1.11 Mg C/ha"
+      - metric: soil_organic_carbon
+        effect: "+20% to +30% relative to other growing windows"
+        note: continuous cover, or autumn-planted and terminated
+      - metric: soil_organic_carbon
+        effect: "+30%"
+        note: "annual cover crop biomass > 7 Mg/ha/yr vs lower"
+    moderators: [planting_termination_date, annual_biomass_production, soil_clay_content]
+    caveat: >
+      TEMPERATE ONLY. Flag extrapolation for semi-arid tropical sites.
+      Disagrees with Joshi (12% vs 7.3%) - encode as a wide distribution
+      with moderate confidence, do not average.
+
+  GCB_2025_agroforestry_multifunctionality:
+    file: data/corpus/meta_analyses/GCB_2025_agroforestry_multifunctionality.pdf
+    tier: meta_analysis
+    strength: meta_analysis
+    citation: "Enhancement of Agroecosystem Multifunctionality by Agroforestry: A Global Quantitative Summary, Global Change Biology 31:e70234 (2025)"
+    doi: 10.1111/gcb.70234
+    scope: global
+    notes: Most recent source in corpus. Reports improvement across major taxa.
+
+  Mupepele_2021_agroforestry_biodiv:
+    file: data/corpus/meta_analyses/Mupepele_2021_agroforestry_biodiv_europe.pdf
+    tier: meta_analysis
+    strength: meta_analysis
+    citation: "Mupepele, A.-C. et al. (2021), European agroforestry has no unequivocal effect on biodiversity: a time-cumulative meta-analysis, BMC Ecology and Evolution 21:193"
+    doi: 10.1186/s12862-021-01911-9
+    scope: Europe, alley cropping and similar; excludes hedgerows
+    notes: >
+      CONTRADICTS GCB_2025. Deliberate inclusion. The agroforestry ->
+      biodiversity edge must carry reduced confidence and cite both.
+
+  Boinot_2022_agroforestry_critique:
+    file: data/corpus/meta_analyses/Boinot_2022_agroforestry_critique.pdf
+    tier: meta_analysis
+    strength: expert
+    citation: "Boinot, S. et al. (2022), Research on agroforestry systems and biodiversity conservation: what can we conclude so far and what should we improve?, BMC Ecology and Evolution 22:24"
+    doi: 10.1186/s12862-022-01977-z
+    notes: >
+      Methodological critique of Mupepele 2021: species richness alone is an
+      insufficient biodiversity measure, and at least 11 of 28 included
+      studies lacked adequate controls. Use for evidence-QUALITY reasoning.
+
+  Woodcock_2019_pollinator_yield:
+    file: data/corpus/meta_analyses/Woodcock_2019_pollinator_diversity_yield.pdf
+    tier: meta_analysis
+    strength: meta_analysis
+    citation: "Woodcock, B.A. et al. (2019), Meta-analysis reveals that pollinator functional diversity and abundance enhance crop pollination and yield, Nature Communications 10:1481"
+    doi: 10.1038/s41467-019-09393-6
+    scope: global, insect-pollinated crops
+    notes: Closes the biodiversity -> farmer-benefit loop. Needed for tradeoff framing.
+
+  Takola_2023_meta_database:
+    file: data/structured/takola_2023/soma_biodiv_final.csv
+    tier: database
+    strength: meta_analysis
+    citation: "Takola, E. et al. (2023), An open-access global database of meta-analyses investigating yield and biodiversity responses to different management practices, Scientific Data"
+    url: https://osf.io/7s9r4/
+    license: CC-BY-NC-ND-4.0
+    n_meta_analyses: 41
+    n_effect_sizes: 298
+    usable_columns:
+      - Biodiv_ES_homog
+      - Biodiv_CI_low_homog
+      - Biodiv_CI_up_homog
+      - Biodiv_ESMetric      # LRR(164), Percentage change(106), HedgesD(23), CohensD(4), HedgesG(1)
+      - Biodiv_measure       # SR(126), Ab(48), Sh(42), Pielou(23), ...
+      - Taxonomic_group
+      - Authors, Year, DOI
+    caveats: >
+      1. Management_grouped has only 5 coarse values (organic, no nutrient
+         addition, grazing pause, diversification, lower intensity). Does NOT
+         map directly to intervention nodes - use Management_raw free text
+         and map by hand.
+      2. Rows are per-ESTIMATE, not per-intervention. Multiple rows share a
+         StudyID. Pool within study or take the overall mean; never treat
+         each row as an independent edge.
+      3. Sign conventions vary by study (control vs treatment direction).
+         VERIFY DIRECTION per row before use. Several diversification rows
+         are negative where a positive effect would be expected.
+      4. Mixed metrics. Convert per-metric: LRR -> exp(x)-1 for percent;
+         Hedges' d is NOT a percentage.
+    license_note: >
+      NC-ND. Fine for this evaluation. Note the restriction if the work is
+      ever redistributed.
+
+  # Fetched at runtime, cached to data/cache/. Not part of the RAG corpus.
+  runtime_apis:
+    SoilGrids:
+      citation: "ISRIC SoilGrids v2.0 (Poggio et al. 2021, SOIL 7:217-240)"
+      endpoint: https://rest.isric.org/soilgrids/v2.0/properties/query
+    NASA_POWER:
+      citation: "NASA POWER Project, Prediction Of Worldwide Energy Resources"
+      endpoint: https://power.larc.nasa.gov/api/temporal/monthly/point
+    GBIF:
+      citation: "GBIF.org Occurrence Download"
+      endpoint: https://api.gbif.org/v1/occurrence/search
+      caveat: >
+        Occurrence records are sampling-effort biased. Raw counts are NOT
+        species richness. Report as observed-vs-expected, never as absolute.
+
+  not_integrated:
+    WOCAT:
+      status: deferred
+      reason: >
+        Public API at wocat.net/api/database/ requires a short-lived
+        client-side auth token (FEToken) that rotates within minutes,
+        making programmatic harvest unreliable. Harvester implemented;
+        integration deferred rather than partially shipped.
+      would_have_provided: field-observed context preconditions for ~1540 SLM practices

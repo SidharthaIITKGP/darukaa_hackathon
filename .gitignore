@@ -1,0 +1,17 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+
+# Source PDFs: 87MB, and redistributing them is a licensing grey area.
+# Reviewers get the derived chunks instead. See scripts/fetch_corpus.sh
+data/corpus/**/*.pdf
+
+# Large rasters
+data/rasters/*.tif
+
+# Rebuildable, but chunks are committed so the system runs without the PDFs
+data/derived/qdrant/
+data/derived/*.faiss

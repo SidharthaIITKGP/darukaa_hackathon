@@ -1,0 +1,162 @@
+# Ingestion manifest.
+#
+# Page ranges (1-indexed, inclusive) worth embedding. Everything else is
+# excluded: reference lists, country-survey annexes, photo catalogues,
+# front matter. Derived from TOC structure + per-page relevance scoring.
+#
+# Rationale for excluding references: they retrieve well on author names and
+# years but contain no reasoning, so they crowd out substantive chunks.
+#
+# tags become retrieval metadata filters. The critic should search
+# tier=meta_analysis first for quantitative claims.
+
+defaults:
+  chunk_tokens: 1000
+  chunk_overlap: 150
+  min_chunk_chars: 250
+
+sources:
+
+  IPCC_2019_SRCCL_Ch6:
+    file: data/corpus/assessments/IPCC_2019_SRCCL_Ch6_response_options.pdf
+    total_pages: 122
+    pages: [[1, 96]]
+    excluded: "97-122 (references)"
+    tier: assessment
+    tags: [tradeoffs, response_options, feasibility, land_degradation, desertification]
+    extract_tables: true
+    table_note: >
+      The response-option tables (integrated ~6.3-6.4) are the single most
+      valuable structured content in the corpus. Parse to rows, not prose.
+      Each maps an intervention to mitigation/adaptation/desertification/
+      degradation/food-security effects with confidence levels.
+
+  IPCC_2022_AR6_WG3_Ch7:
+    file: data/corpus/assessments/IPCC_2022_AR6_WG3_Ch7_AFOLU.pdf
+    total_pages: 114
+    pages: [[4, 9], [27, 60], [77, 85]]
+    excluded: "1-3 (front matter), 10-26 + 61-76 (low relevance: emissions accounting, scenarios), 86-114 (references)"
+    tier: assessment
+    tags: [mitigation_potential, afolu, carbon, cost]
+    extract_tables: true
+
+  IPBES_2018_LDR:
+    file: data/corpus/assessments/IPBES_2018_land_degradation_spm.pdf
+    total_pages: 32
+    pages: [[1, 31]]
+    excluded: "32 (colophon)"
+    tier: assessment
+    tags: [land_degradation, restoration, biodiversity, drivers]
+    extract_tables: false
+    note: Short and dense throughout. Ingest whole.
+
+  FAO_2020_soil_biodiversity:
+    file: data/corpus/assessments/FAO_2020_soil_biodiversity.pdf
+    total_pages: 616
+    pages: [[145, 220], [221, 292], [293, 340]]
+    excluded: >
+      1-144 (front matter + Ch1-2: soil-organism taxonomy and photo catalogue,
+      one photo per page - no reasoning content),
+      341-368 (Ch6-7: national-level status, policy),
+      369-476 (Annex I: country survey responses - repetitive, no mechanism),
+      477-616 (references + annexes)
+    tier: assessment
+    tags: [soil_biota, microbial, mechanism, ecosystem_services, threats, management]
+    extract_tables: false
+    chapters_kept:
+      - "Ch3 (p145-220): soil biodiversity -> ecosystem functions. Key: 3.5.2 soil carbon cycles, 3.5.3 carbon sequestration, 3.5.4 erosion prevention, 3.5.5 water flow regulation, 3.5.8 biocontrol"
+      - "Ch4 (p221-292): threats. Key: 4.2.3 agricultural intensification, 4.2.4 loss of SOM/SOC, 4.2.10 erosion, 4.2.11 climate change, 4.3.2 Asia"
+      - "Ch5 (p293-340): responses and management. Key: 5.2.1 land use and degradation, 5.4.3 soil biodiversity as a farmer's tool"
+    note: >
+      616 -> 196 pages. This is the biggest single win in the manifest.
+      This document supplies MECHANISM (why an intervention works via soil
+      biota), not effect sizes. Tag accordingly.
+
+  FAO_2022_GSOCseq:
+    file: data/corpus/assessments/FAO_2022_GSOCseq_technical_report.pdf
+    total_pages: 181
+    pages: [[28, 51], [62, 108]]
+    excluded: "1-27 (front matter), 52-61 (model implementation detail), 109-181 (references + Annex A submissions + Annex B country tables)"
+    tier: model_output
+    tags: [soc_sequestration, ssm_scenarios, uncertainty, spatial]
+    extract_tables: true
+    note: >
+      Keep the SSM scenario definitions (+5/+10/+20% carbon input over BAU)
+      and the results/discussion sections. Annex B is 8 pages of per-country
+      tables with no reasoning - excluded.
+
+  FAO_2017_VGSSM:
+    file: data/corpus/assessments/FAO_2017_VGSSM.pdf
+    total_pages: 26
+    pages: [[8, 24]]
+    excluded: "1-7 (front matter), 25-26 (back matter)"
+    tier: assessment
+    tags: [soil_management, practice_guidance]
+    extract_tables: false
+
+  # --- Meta-analyses: ingest in full except reference lists. These are the
+  # --- effect-size sources, so precision matters more than volume here.
+
+  Joshi_2023_covercrops_SOC:
+    file: data/corpus/meta_analyses/Joshi_2023_covercrops_SOC_corn.pdf
+    total_pages: 14
+    pages: [[1, 12]]
+    excluded: "13-14 (references)"
+    tier: meta_analysis
+    tags: [cover_crops, soc, effect_size, tillage, soil_texture]
+    extract_tables: true
+    priority: high
+
+  McClelland_2020_covercrops_SOC:
+    file: data/corpus/meta_analyses/McClelland_2020_covercrops_SOC_temperate.pdf
+    total_pages: 19
+    pages: [[1, 16]]
+    excluded: "17-19 (references, appendix)"
+    tier: meta_analysis
+    tags: [cover_crops, soc, effect_size, temperate, moderators]
+    extract_tables: true
+    priority: high
+
+  GCB_2025_agroforestry_multifunctionality:
+    file: data/corpus/meta_analyses/GCB_2025_agroforestry_multifunctionality.pdf
+    total_pages: 19
+    pages: [[1, 16]]
+    excluded: "17-19 (references)"
+    tier: meta_analysis
+    tags: [agroforestry, biodiversity, multifunctionality, effect_size]
+    extract_tables: true
+    priority: high
+
+  Mupepele_2021_agroforestry_biodiv:
+    file: data/corpus/meta_analyses/Mupepele_2021_agroforestry_biodiv_europe.pdf
+    total_pages: 12
+    pages: [[1, 10]]
+    excluded: "11-12 (references)"
+    tier: meta_analysis
+    tags: [agroforestry, biodiversity, effect_size, europe, null_result]
+    extract_tables: true
+    note: Contradicts GCB_2025. Both must be retrievable for the same query.
+
+  Boinot_2022_agroforestry_critique:
+    file: data/corpus/meta_analyses/Boinot_2022_agroforestry_critique.pdf
+    total_pages: 6
+    pages: [[1, 5]]
+    excluded: "6 (references)"
+    tier: meta_analysis
+    tags: [evidence_quality, agroforestry, methodology_critique]
+    extract_tables: false
+
+  Woodcock_2019_pollinator_yield:
+    file: data/corpus/meta_analyses/Woodcock_2019_pollinator_diversity_yield.pdf
+    total_pages: 10
+    pages: [[1, 8]]
+    excluded: "9-10 (references)"
+    tier: meta_analysis
+    tags: [pollinators, yield, functional_diversity, effect_size]
+    extract_tables: true
+
+summary:
+  raw_pages: 1171
+  ingested_pages: 528
+  reduction: "55% discarded"
+  largest_saving: "FAO soil biodiversity 616 -> 196 pages"

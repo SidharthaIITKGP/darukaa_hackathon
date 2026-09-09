@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -77,17 +78,63 @@ DEFAULT_MODEL = "anthropic/claude-sonnet-5"
 # Wall-clock ceiling on one model call. A conversational turn that waits
 # longer than this has already failed as a conversation.
 LLM_TIMEOUT_S = 20.0
+# The same ceiling on a deployment that has no latency budget to spare. A
+# hosted demo waiting 20s per entailment call, several calls deep, reads as a
+# hang, so the deployed build trades verdicts for a response that arrives.
+LLM_TIMEOUT_LOW_MEMORY_S = 8.0
 
 # How hard a rate-limited call is retried before the caller falls back. The
 # budget is per call and deliberately small: a conversational turn that waits
 # out three rate limits has already failed as a conversation, so this buys a
 # verdict for a bounded delay rather than waiting indefinitely for one.
 LLM_RATE_LIMIT_RETRIES = 3
+# One retry on the deployed build. Three retries times a 20s backoff per call
+# is the difference between a slow answer and no answer at all.
+LLM_RATE_LIMIT_RETRIES_LOW_MEMORY = 1
+
+# Ceiling on entailment calls in one critic pass on a low memory deployment.
+# The critic is a quality check, and a quality check that prevents an answer
+# from returning has stopped being one. Claims past this cap are reported as
+# unverified rather than silently counted either way.
+MAX_ENTAILMENT_CALLS_LOW_MEMORY = 5
 LLM_RATE_LIMIT_DEFAULT_WAIT_S = 20.0
 LLM_RATE_LIMIT_WAIT_MARGIN_S = 2.0
 LLM_RATE_LIMIT_MAX_WAIT_S = 45.0
 
 _LLM_RETRY_AFTER = re.compile(r"try again in ([\d.]+)\s*s", re.I)
+
+
+def _llm_timeout() -> float:
+    return LLM_TIMEOUT_LOW_MEMORY_S if low_memory() else LLM_TIMEOUT_S
+
+
+def _llm_retries() -> int:
+    return LLM_RATE_LIMIT_RETRIES_LOW_MEMORY if low_memory() else LLM_RATE_LIMIT_RETRIES
+
+
+# Whether this turn has already reported a model failure. The generic litellm
+# banner says nothing diagnosable and repeats once per failed call, so the
+# real exception is printed once and the rest of the turn stays quiet.
+_LLM_ERROR_REPORTED = False
+
+
+def reset_llm_error_reporting() -> None:
+    """Allow one model failure to be reported again on the next turn."""
+    global _LLM_ERROR_REPORTED
+    _LLM_ERROR_REPORTED = False
+
+
+def _report_llm_error(error: Exception) -> None:
+    global _LLM_ERROR_REPORTED
+    if _LLM_ERROR_REPORTED:
+        return
+    _LLM_ERROR_REPORTED = True
+    print(
+        f"[darukaa] model call failed ({model_name()}): "
+        f"{type(error).__name__}: {str(error)[:400]}",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def _rate_limited(error: Exception) -> bool:
@@ -156,6 +203,24 @@ def model_name() -> str:
     return os.environ.get("DARUKAA_MODEL", DEFAULT_MODEL)
 
 
+SKIP_CRITIC_ENV = "DARUKAA_SKIP_CRITIC"
+
+
+def skip_critic() -> bool:
+    """Whether the critic loop is bypassed for this run.
+
+    Defaults on under low memory, because that build is a hosted demo where
+    the critic's entailment calls are the whole latency budget and a stalled
+    verification prevents any answer from returning. An explicit value always
+    wins, so the eval harness and a local full stack run keep the critic by
+    setting it to 0, and those are where the reported numbers came from.
+    """
+    raw = os.environ.get(SKIP_CRITIC_ENV)
+    if raw is not None and raw.strip() != "":
+        return raw.strip().lower() in ("1", "true", "yes")
+    return low_memory()
+
+
 def llm_available() -> bool:
     """Whether a model call is worth attempting.
 
@@ -192,13 +257,14 @@ def _llm(system: str, user: str, json_only: bool) -> str | None:
 
     import litellm
 
+    retries = _llm_retries()
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-    for attempt in range(LLM_RATE_LIMIT_RETRIES + 1):
+    for attempt in range(retries + 1):
         try:
             response = litellm.completion(
                 model=model_name(),
                 messages=messages,
-                timeout=LLM_TIMEOUT_S,
+                timeout=_llm_timeout(),
                 max_tokens=1024,
                 temperature=0.0,
                 **({"response_format": {"type": "json_object"}} if json_only else {}),
@@ -211,9 +277,10 @@ def _llm(system: str, user: str, json_only: bool) -> str | None:
             # grounding figure reports a check that never ran. Measured on a
             # batch eval against an 8000 tokens-per-minute allowance, 199 of
             # 220 entailment calls were being lost this way.
-            if _rate_limited(error) and attempt < LLM_RATE_LIMIT_RETRIES:
+            if _rate_limited(error) and attempt < retries:
                 time.sleep(_rate_limit_wait(error))
                 continue
+            _report_llm_error(error)
             return None
         return response.choices[0].message.content
     return None
@@ -558,6 +625,10 @@ def intake_node(state: ConversationState) -> dict[str, Any]:
     already had a value and now has a different one is a correction, and is
     reported as revised rather than absorbed silently.
     """
+    # First node of every turn, so this is where the once-per-turn model
+    # error report is re-armed.
+    reset_llm_error_reporting()
+
     site: SiteState = state["site"]
     messages = state.get("messages", [])
     user_messages = [m for m in messages if m.get("role") == "user"]
@@ -1542,6 +1613,17 @@ def grounding_coverage(claims: list[Claim]) -> float:
     return len(grounded) / len(scored)
 
 
+CRITIC_DISABLED_NOTE = (
+    "GROUNDING: not verified (critic disabled in this build)\n"
+    "  The critic loop, which decomposes this report into claims and checks each one\n"
+    "  against the retrieved passages, did not run here. Every figure above still comes\n"
+    "  from the propagation engine and every citation is registered in sources.yaml, but\n"
+    "  no claim on this page has been verified, and no coverage figure is reported\n"
+    "  because none was computed. The full critic runs locally and in the evaluation\n"
+    "  harness, which is where the reported grounding numbers come from."
+)
+
+
 def coverage_report(claims: list[Claim], coverage: float) -> str:
     """The grounding figure broken into how each claim was settled.
 
@@ -2037,20 +2119,53 @@ def verify_claims(
         if resolve_by_traceability(claim, ranked) is None:
             pending.append(claim)
 
+    # Budget on how many claims may reach an entailment call this pass. Only
+    # applied on the deployed build: a stalling provider there must not be
+    # able to hold the response open, and a claim past the budget is reported
+    # as unverified rather than guessed at in either direction.
+    budget = MAX_ENTAILMENT_CALLS_LOW_MEMORY if low_memory() else None
+    spent = 0
+
     to_retrieve: list[Claim] = []
     for claim in pending:
         reused = _reuse_bound(claim, bound)
-        if reused is not None:
-            _apply_retrieval_verdict(claim, reused)
-        else:
+        if reused is None:
             to_retrieve.append(claim)
+            continue
+        if budget is not None and spent >= budget:
+            _mark_unverified(claim, budget)
+            continue
+        spent += 1
+        _apply_retrieval_verdict(claim, reused)
 
     for claim in to_retrieve:
+        if budget is not None and spent >= budget:
+            _mark_unverified(claim, budget)
+            continue
+        spent += 1
         _apply_retrieval_verdict(
             claim, search(claim.text, k=3, source_ids=list(claim.source_ids), rerank=True)
         )
 
     return claims
+
+
+def _mark_unverified(claim: Claim, budget: int) -> Claim:
+    """Record that a claim was never checked, without judging it.
+
+    Deliberately not "supported" and not "softened". Both of those are
+    verdicts, and no verdict was reached. corpus_gap is the existing category
+    for a claim the system declines to assert support for, and the note says
+    plainly that the reason is a budget rather than the corpus.
+    """
+    claim.supported = False
+    claim.category = "corpus_gap"
+    claim.support_note = (
+        f"Not verified. This build caps entailment checks at {budget} per pass to bound "
+        f"the response time, and that budget was spent before this claim. The claim keeps "
+        f"its registered citation and is not counted as grounded."
+    )
+    return claim
 
 
 def _reuse_bound(
@@ -2094,6 +2209,19 @@ def critic_node(state: ConversationState) -> dict[str, Any]:
     ranked: list[RankedIntervention] = state["ranked"] or []
     site: SiteState = state["site"]
     bound = state.get("evidence", {}) or {}
+
+    if skip_critic():
+        # No verification ran, so there is no coverage figure to report.
+        # grounding_coverage stays None rather than 0.0: zero would be a
+        # measurement saying nothing was grounded, and the truth is that
+        # nothing was measured. The draft says so in the same words.
+        return {
+            "claims": [],
+            "grounding_coverage": None,
+            "withdrawn": [],
+            "revision_pending": False,
+            "draft": draft + "\n" + CRITIC_DISABLED_NOTE,
+        }
 
     seen: set[tuple[str, str]] = set()
     unique: list[Claim] = []

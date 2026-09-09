@@ -82,12 +82,23 @@ def _configure_env() -> None:
     if low_memory:
         os.environ["DARUKAA_LOW_MEMORY"] = low_memory
 
+    # Defaults on under low memory inside skip_critic(). Passed through so a
+    # deployment can turn the critic back on without a code change.
+    skip = _secret("DARUKAA_SKIP_CRITIC")
+    if skip:
+        os.environ["DARUKAA_SKIP_CRITIC"] = skip
+
 
 _configure_env()
 
 from src.agents import render  # noqa: E402
 from src.agents.graph import Conversation, build_agent_graph  # noqa: E402
-from src.agents.nodes import RENDER_TOP_N, coverage_report, model_name  # noqa: E402
+from src.agents.nodes import (  # noqa: E402
+    RENDER_TOP_N,
+    coverage_report,
+    model_name,
+    skip_critic,
+)
 from src.demo import DEMO_SITES  # noqa: E402
 from src.graph.edges import build_graph  # noqa: E402
 from src.graph.propagate import (  # noqa: E402
@@ -407,6 +418,11 @@ def draw_sidebar() -> str | None:
             st.info(
                 "Deployed build: BM25 retrieval only (1GB memory limit). Full hybrid "
                 "dense + BM25 + cross-encoder runs locally; see README."
+            )
+        if skip_critic():
+            st.caption(
+                "Critic loop disabled in this build, so grounding is reported as not "
+                "verified rather than as a number. It runs locally and in the eval harness."
             )
 
     return clicked

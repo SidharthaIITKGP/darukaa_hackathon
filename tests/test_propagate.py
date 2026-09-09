@@ -339,3 +339,77 @@ def test_rank_interventions_runs(graph: nx.MultiDiGraph) -> None:
     ranked = rank_interventions(graph, site, n=1000, seed=0)
     assert len(ranked) == len(graph.nodes) or len(ranked) > 0
     assert ranked[0].score >= ranked[-1].score
+
+
+# ============================== determinism ==============================
+#
+# The engine's numbers have to be reproducible across processes, not merely
+# within one. An eval harness cannot compare a run against a baseline if the
+# system's own figures move between invocations, so these are a prerequisite
+# for the eval stage rather than a nicety.
+#
+# The bug these cover: nx.descendants returns a set, a subgraph built from one
+# iterates its nodes in that set's order, and that order set the order
+# predecessors were visited inside forward_propagate. Each predecessor draws
+# from the rng, so the draw sequence, and therefore every figure, depended on
+# PYTHONHASHSEED.
+
+
+def test_propagate_is_identical_across_calls_with_the_same_seed(graph: nx.MultiDiGraph) -> None:
+    site = _deccan_site()
+    first = propagate(
+        graph, "legume_cover_crop", "crop_yield", site, n=4000, rng=np.random.default_rng(0)
+    )
+    second = propagate(
+        graph, "legume_cover_crop", "crop_yield", site, n=4000, rng=np.random.default_rng(0)
+    )
+    # Exact equality, not approximate. Same seed and same draw order means
+    # the same floats, and anything less would hide the ordering bug.
+    assert first.p50 == second.p50
+    assert first.ci90 == second.ci90
+    assert first.mean == second.mean
+    assert first.p_positive == second.p_positive
+
+
+def test_rank_interventions_is_identical_across_calls_with_the_same_seed(
+    graph: nx.MultiDiGraph,
+) -> None:
+    site = _deccan_site()
+    first = rank_interventions(graph, site, n=2000, seed=0)
+    second = rank_interventions(graph, site, n=2000, seed=0)
+
+    assert [r.intervention for r in first] == [r.intervention for r in second]
+    assert [r.score for r in first] == [r.score for r in second]
+    for a, b in zip(first, second):
+        assert a.constraint_movement == b.constraint_movement
+        assert {t: r.p50 for t, r in a.effects.items()} == {t: r.p50 for t, r in b.effects.items()}
+
+
+def test_demo_output_is_identical_across_python_hash_seeds() -> None:
+    """The end-to-end guarantee, across processes.
+
+    PYTHONHASHSEED has to be set before the interpreter starts, so this runs
+    the demo in subprocesses rather than in-process.
+    """
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    outputs = []
+    for seed in ("1", "2", "12345"):
+        env = {**os.environ, "PYTHONHASHSEED": seed}
+        completed = subprocess.run(
+            [sys.executable, "-m", "src.demo"],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        assert completed.returncode == 0, completed.stderr[-2000:]
+        outputs.append(completed.stdout)
+
+    assert outputs[0] == outputs[1], "output differs between PYTHONHASHSEED 1 and 2"
+    assert outputs[0] == outputs[2], "output differs between PYTHONHASHSEED 1 and 12345"

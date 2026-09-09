@@ -411,6 +411,15 @@ def _search_uncached(
         # assumption between them. The cost is that it cannot be precomputed:
         # every pair is a forward pass at query time, which is why only the
         # top RERANK_DEPTH fused candidates get scored.
+        #
+        # One predict() call per query, and deliberately not one call across
+        # many queries. Batching every claim's candidates into a single call
+        # was implemented and measured on this corpus: 14 claim queries took
+        # 21.8s sequentially and 23.5s batched, i.e. 0.93x, with identical
+        # scores. On CPU this model is compute-bound rather than
+        # call-overhead-bound, so there is no fixed cost to amortise, and a
+        # wide batch pads every sequence to the longest one in it and spends
+        # the saving on padding. The batched version was reverted.
         scores = _reranker(precise).predict([(query, c.body) for c in head])
         for chunk, score in zip(head, scores):
             chunk.rerank_score = float(score)

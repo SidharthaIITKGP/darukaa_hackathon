@@ -44,6 +44,8 @@ from src.agents.state import (
 )
 from src.graph.edges import build_graph
 from src.graph.propagate import (
+    DELTA_REF,
+    TRANSMISSION,
     RankedIntervention,
     limiting_factor,
     rank_interventions,
@@ -95,7 +97,11 @@ VOI_SAMPLES = 800
 # budget for a turn rather than a claim about how many recommendations
 # matter.
 BIND_TOP_N = 3
-RENDER_TOP_N = 4
+# Three recommendations, matching BIND_TOP_N so every rendered recommendation
+# has passages bound to it. Three is enough to show the multi-variable
+# reasoning and the tier gate, and the fourth cost a quarter of the critic's
+# claim budget to say something the first three had already demonstrated.
+RENDER_TOP_N = 3
 
 
 # ============================== language model ==============================
@@ -1114,12 +1120,13 @@ def bind_node(state: ConversationState) -> dict[str, Any]:
     ranked: list[RankedIntervention] = state["ranked"] or []
     graph = build_graph()
 
+    unique_edges: dict[str, CausalEdge] = {}
+    for _intervention, edge in _bindable_edges(graph, ranked):
+        unique_edges.setdefault(f"{edge.source}->{edge.target}", edge)
+
     evidence: dict[str, list[RetrievedChunk]] = {}
     notes: list[str] = []
-    for _intervention, edge in _bindable_edges(graph, ranked):
-        key = f"{edge.source}->{edge.target}"
-        if key in evidence:
-            continue
+    for key, edge in unique_edges.items():
         chunks = bind_evidence(edge, site, k=3, precise=False)
         evidence[key] = chunks
         if not has_support(chunks):
@@ -1409,14 +1416,69 @@ def synthesise_node(state: ConversationState) -> dict[str, Any]:
     return {"draft": draft}
 
 
-def _coverage_line(claims: list[Claim], coverage: float) -> str:
-    scored = [c for c in claims if c.kind in ("quantitative", "citation")]
-    supported = [c for c in scored if c.supported]
-    return (
-        f"GROUNDING: {len(supported)} of {len(scored)} quantitative and citation claims "
-        f"entailed by retrieved evidence ({coverage:.0%} coverage). Every figure is traced "
-        f"to the propagation result that produced it and to the sources its edges cite."
+# The claim kinds that carry an empirical assertion and so count towards
+# coverage. Qualitative prose is excluded because it asserts nothing that
+# could be grounded, and counting it as supported would inflate the figure.
+GROUNDED_KINDS = ("quantitative", "causal", "citation")
+
+
+def grounding_coverage(claims: list[Claim]) -> float:
+    """Fraction of empirical claims that are grounded.
+
+    Grounded means either traceable to the propagation result that produced
+    it or entailed by a retrieved passage. Both are real grounding and
+    neither is stronger than the other: they answer different questions
+    about different kinds of claim.
+    """
+    scored = [c for c in claims if c.kind in GROUNDED_KINDS]
+    if not scored:
+        return 1.0
+    grounded = [c for c in scored if c.category in ("traceable", "entailed")]
+    return len(grounded) / len(scored)
+
+
+def coverage_report(claims: list[Claim], coverage: float) -> str:
+    """The grounding figure broken into how each claim was settled.
+
+    A bare percentage invites the wrong inference, because the residue is not
+    one thing. A claim can fail because its number came from nowhere, which
+    is the system's fault and is what the critic exists to catch, or because
+    this corpus has no meta-analysis on the topic, which is a fact about the
+    twelve documents loaded here. Contour bunding is the standing example:
+    the FAO guidelines give the direction and no pooled effect size exists in
+    the corpus, so has_support finds nothing above the floor. Reporting those
+    two together as "unsupported" would read as weak rigour when the second
+    is the opposite: it is the system declining to claim support it does not
+    have.
+    """
+    scored = [c for c in claims if c.kind in GROUNDED_KINDS]
+    counts = {
+        "traceable": sum(1 for c in scored if c.category == "traceable"),
+        "entailed": sum(1 for c in scored if c.category == "entailed"),
+        "softened": sum(1 for c in scored if c.category == "softened"),
+        "corpus_gap": sum(1 for c in scored if c.category == "corpus_gap"),
+    }
+    grounded = counts["traceable"] + counts["entailed"]
+    lines = [
+        f"GROUNDING: {coverage:.0%}  ({grounded} of {len(scored)} claims)",
+        f"  traceable to propagation:      {counts['traceable']:>3}",
+        f"  entailed by retrieved passage: {counts['entailed']:>3}",
+        f"  unsupported, softened:         {counts['softened']:>3}",
+        f"  no corpus evidence available:  {counts['corpus_gap']:>3}   <- corpus gap, not a "
+        f"failed check",
+    ]
+    if counts["corpus_gap"]:
+        lines.append(
+            "  The last line counts claims whose cited source returned no passage above the "
+            "cross-encoder support floor. The relationship may well hold; this corpus of "
+            "twelve documents does not quantify it, so the claim is marked rather than "
+            "asserted. Reading it as a weakness of the reasoning inverts what it records."
+        )
+    lines.append(
+        "  Qualitative framing and instruction prose is excluded from the denominator: it "
+        "asserts nothing that could be grounded."
     )
+    return "\n".join(lines)
 
 
 # ================================== critic ==================================
@@ -1709,22 +1771,46 @@ def verify_claim(
 ) -> Claim:
     """Verify one claim and return it with a verdict attached.
 
-    Quantitative claims face two gates. First traceability: every figure in
-    the claim must be one the propagation engine actually produced for this
-    site, which is what catches a number that came from nowhere. Then
-    retrieval and entailment on the sources its edges cite, which is what
-    catches a relationship the corpus does not back.
+    Convenience wrapper over the two stages verify_claims runs as a batch.
+    Identical in result, and the path a single ad-hoc check takes.
+    """
+    resolved = resolve_by_traceability(claim, ranked)
+    if resolved is not None:
+        return resolved
+    chunks = _reuse_bound(claim, bound) or search(
+        claim.text, k=3, source_ids=claim.source_ids, rerank=True
+    )
+    return _apply_retrieval_verdict(claim, chunks)
 
-    bound, when given, is what the bind node already retrieved for the edges
-    behind this draft. A mechanism claim is a verbatim edge mechanism, and
-    bind_evidence already ran a reranked search restricted to that edge's own
-    sources, so re-retrieving it would pay a second cross-encoder pass for
-    the same question. Reusing it is not a shortcut past verification: the
-    support floor and the entailment check still run, on the passages the
-    edge actually cites.
+
+def resolve_by_traceability(claim: Claim, ranked: list[RankedIntervention]) -> Claim | None:
+    """Settle a claim without touching the corpus, or return None.
+
+    Three kinds of claim are decided here, and none of them is decidable by
+    retrieval:
+
+    A figure the propagation engine did not produce came from nowhere. No
+    passage could rescue it, so it is withdrawn on the spot.
+
+    A figure the engine did produce is already verified, because its
+    provenance is the graph and not a document: the corpus contains published
+    effect sizes, never a Monte Carlo output composed along a path at this
+    site. Sending it to retrieval asked a question no passage can answer and
+    then counted the silence against it. What the corpus is asked to back is
+    the RELATIONSHIP, and that is checked as the mechanism and citation claims
+    of the same recommendation, which do go to retrieval. The number carries
+    the methodology note instead of a citation.
+
+    A tier statement reports where this system's own gate put an
+    intervention. Its figure is checked as above and no paper discusses this
+    system's tiering.
+
+    Claims that reach the end of this function are the ones a passage can
+    actually bear on, and only those pay for retrieval.
     """
     if claim.kind == "qualitative":
         claim.supported = None
+        claim.category = None
         claim.support_note = (
             "Framing or instruction prose, so there is no empirical claim to check. Where such "
             "a line carries a figure it is quoted from a curated mechanism or contested note, "
@@ -1733,55 +1819,103 @@ def verify_claim(
         return claim
 
     if claim.kind == "quantitative":
-        traceable = _traceable_figures(ranked)
-        figures = _figures(claim.text)
-        stray = sorted(figures - traceable)
+        stray = sorted(_figures(claim.text) - _traceable_figures(ranked))
         if stray:
             claim.supported = False
+            claim.category = "softened"
             claim.support_note = (
                 f"No propagation result for this site produces {', '.join(stray)}. The figure "
                 f"is not traceable to the causal graph, so it is withdrawn rather than cited."
             )
             return claim
 
-        if claim.text.startswith("Tier "):
-            # A tier assignment states where this system's own gate put the
-            # intervention, using a figure the engine computed. Its figure has
-            # just been checked against that computation, which is the whole
-            # of what can be verified: no paper in the corpus discusses this
-            # system's tiering, so demanding retrieval support for it would
-            # withdraw a correct statement for want of a citation that could
-            # not exist.
-            claim.supported = True
-            claim.support_note = (
-                "Ranking-rule statement. Its figure is traceable to the propagation result "
-                "for this site; corpus support does not apply to the system's own tier rule."
-            )
-            return claim
+        claim.supported = True
+        claim.category = "traceable"
+        claim.support_note = (
+            "Figure traceable to the propagation result for this site. Composed "
+            f"multiplicatively along the causal chain with TRANSMISSION={TRANSMISSION:g} and "
+            f"DELTA_REF={DELTA_REF:g}; the interval is a Monte Carlo interval, not a published "
+            "one. The relationship behind it is checked separately as this recommendation's "
+            "mechanism and citation claims."
+        )
+        return claim
 
     if not claim.source_ids:
         claim.supported = False
+        claim.category = "softened"
         claim.support_note = (
             "The claim cites no source registered in sources.yaml, so there is nothing to "
             "verify it against and it must not be emitted."
         )
         return claim
 
-    chunks = _reuse_bound(claim, bound) or search(
-        claim.text, k=3, source_ids=claim.source_ids, rerank=True
-    )
+    return None
+
+
+def _apply_retrieval_verdict(claim: Claim, chunks: list[RetrievedChunk]) -> Claim:
+    """Turn retrieved passages into a verdict on one claim."""
     if not has_support(chunks):
         claim.supported = False
+        claim.category = "corpus_gap"
         claim.support_note = (
             "Retrieval restricted to the cited sources found no passage above the support "
-            "floor, so nothing in the loaded corpus backs this claim."
+            "floor. That is a gap in the corpus loaded here rather than a fault in the claim: "
+            "the edge keeps its registered citation and the claim is marked, not asserted."
         )
         return claim
 
     verdict = check_entailment(claim, chunks)
     claim.supported = verdict.verdict == "supported"
+    claim.category = "entailed" if claim.supported else "softened"
     claim.support_note = f"{verdict.verdict}: {verdict.reason}"
     return claim
+
+
+def verify_claims(
+    claims: list[Claim],
+    ranked: list[RankedIntervention],
+    site: SiteState,
+    bound: dict[str, list[RetrievedChunk]] | None = None,
+) -> list[Claim]:
+    """Verify a whole draft's claims, cheapest resolution first.
+
+    Stage one settles everything traceability can settle: every figure the
+    engine produced, every figure it did not, and all prose carrying no
+    empirical assertion. None of that needs the corpus, and this is where the
+    latency went. On the Deccan site it resolves roughly a third of the
+    empirical claims without a single cross-encoder pass.
+
+    Stage two answers what is left, the mechanism and citation claims a
+    passage can actually bear on, from the passages bind already retrieved
+    where it can and from a fresh reranked search where it cannot. bound is
+    bind's output: a mechanism claim is a verbatim edge mechanism and
+    bind_evidence already ran a reranked search restricted to that edge's own
+    sources. Reuse is not a shortcut past verification, since the support
+    floor and the entailment check still run on the passages the edge cites.
+
+    One search per remaining claim, deliberately. Collecting them into a
+    single batched cross-encoder call was implemented and measured at 0.93x,
+    slightly slower: see the note in src.retrieval.search.
+    """
+    pending: list[Claim] = []
+    for claim in claims:
+        if resolve_by_traceability(claim, ranked) is None:
+            pending.append(claim)
+
+    to_retrieve: list[Claim] = []
+    for claim in pending:
+        reused = _reuse_bound(claim, bound)
+        if reused is not None:
+            _apply_retrieval_verdict(claim, reused)
+        else:
+            to_retrieve.append(claim)
+
+    for claim in to_retrieve:
+        _apply_retrieval_verdict(
+            claim, search(claim.text, k=3, source_ids=list(claim.source_ids), rerank=True)
+        )
+
+    return claims
 
 
 def _reuse_bound(
@@ -1826,27 +1960,31 @@ def critic_node(state: ConversationState) -> dict[str, Any]:
     site: SiteState = state["site"]
     bound = state.get("evidence", {}) or {}
 
-    verdicts: dict[tuple[str, str], Claim] = {}
-    claims: list[Claim] = []
+    seen: set[tuple[str, str]] = set()
+    unique: list[Claim] = []
     for claim in decompose(draft):
         key = (claim.kind, claim.text)
-        decided = verdicts.get(key)
-        if decided is None:
-            decided = verify_claim(claim, ranked, site, bound)
-            verdicts[key] = decided
-            claims.append(decided)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(claim)
 
-    scored = [c for c in claims if c.kind in ("quantitative", "citation")]
-    supported = [c for c in scored if c.supported]
-    coverage = (len(supported) / len(scored)) if scored else 1.0
+    claims = verify_claims(unique, ranked, site, bound)
+    coverage = grounding_coverage(claims)
 
     unsupported = [c for c in claims if c.supported is False]
     passes = state.get("critic_passes", 0)
+    # One decision, recorded, rather than the same predicate evaluated here
+    # and again in the router. Evaluating it twice was an off-by-one: this
+    # node saw the count before its own increment and concluded it would
+    # revise, the router saw it after and ended the run, and the grounding
+    # figure went with the pass that never happened.
     revising = bool(unsupported) and passes < MAX_CRITIC_PASSES
     update: dict[str, Any] = {
         "claims": claims,
         "grounding_coverage": coverage,
         "withdrawn": [c.text for c in unsupported],
+        "revision_pending": revising,
     }
     if revising:
         update["critic_passes"] = passes + 1
@@ -1855,7 +1993,7 @@ def critic_node(state: ConversationState) -> dict[str, Any]:
         # the draft it was measured against. On a revising pass it is left
         # off, because synthesise is about to replace the draft and a figure
         # describing the old one would be reporting a document nobody reads.
-        update["draft"] = draft + "\n" + _coverage_line(claims, coverage)
+        update["draft"] = draft + "\n" + coverage_report(claims, coverage)
 
     turn = state.get("turn", 0)
     if turn - state.get("summary_turn", 0) >= SUMMARY_EVERY:
@@ -1865,6 +2003,15 @@ def critic_node(state: ConversationState) -> dict[str, Any]:
 
 
 def needs_revision(state: ConversationState) -> bool:
+    """Whether the critic asked for another pass.
+
+    Reads the flag the critic recorded rather than recomputing the decision,
+    so the router and the node cannot disagree about whether a revision is
+    happening. Falls back to the claim-level check for a state assembled by
+    hand without having run the critic.
+    """
+    if "revision_pending" in state:
+        return bool(state["revision_pending"])
     return any(c.supported is False for c in _as_claims(state.get("claims")))
 
 

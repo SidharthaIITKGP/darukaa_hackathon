@@ -382,9 +382,64 @@ def test_grounding_coverage_is_computed_and_in_range(graph):
     assert coverage is not None
     assert 0.0 <= coverage <= 1.0
 
-    scored = [c for c in result["claims"] if c.kind in ("quantitative", "citation")]
-    supported = [c for c in scored if c.supported]
-    assert coverage == pytest.approx(len(supported) / len(scored))
+    scored = [c for c in result["claims"] if c.kind in nodes.GROUNDED_KINDS]
+    grounded = [c for c in scored if c.category in ("traceable", "entailed")]
+    assert coverage == pytest.approx(len(grounded) / len(scored))
+
+
+def test_every_empirical_claim_lands_in_exactly_one_category(graph):
+    """The breakdown has to account for the denominator, or it is decoration."""
+    site = _deccan(slope=5.0)
+    state = _drafted_state(graph, site)
+    result = critic_node(state)
+
+    scored = [c for c in result["claims"] if c.kind in nodes.GROUNDED_KINDS]
+    categories = ["traceable", "entailed", "softened", "corpus_gap"]
+    counts = {name: sum(1 for c in scored if c.category == name) for name in categories}
+    assert sum(counts.values()) == len(scored), f"claims fell outside the breakdown: {counts}"
+    assert all(c.category is not None for c in scored)
+    # Qualitative prose is deliberately outside the denominator.
+    assert all(c.category is None for c in result["claims"] if c.kind == "qualitative")
+
+
+def test_coverage_report_separates_corpus_gaps_from_failed_checks(graph):
+    site = _deccan(slope=5.0)
+    state = _drafted_state(graph, site)
+    result = critic_node(state)
+
+    line = nodes.coverage_report(result["claims"], result["grounding_coverage"])
+    assert "traceable to propagation:" in line
+    assert "entailed by retrieved passage:" in line
+    assert "unsupported, softened:" in line
+    assert "no corpus evidence available:" in line
+    assert "corpus gap, not a failed check" in line
+
+
+def test_a_traceable_figure_is_not_sent_to_retrieval(graph, monkeypatch):
+    """The largest share of the latency saving, asserted rather than assumed.
+
+    A propagated figure cannot appear in any passage, so asking retrieval
+    about it spends a cross-encoder pass to learn nothing. If any traceable
+    claim reaches search at all, this test fails.
+    """
+    site = _deccan(slope=5.0)
+    ranked = rank_interventions(graph, site)
+    figure = nodes.render.pct(ranked[0].effects["plant_available_water"].p50)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("a traceable claim was sent to retrieval")
+
+    monkeypatch.setattr(nodes, "search", forbidden)
+
+    claim = Claim(
+        text=f"Contour bunding changes plant available water by {figure} at this site.",
+        kind="quantitative",
+        source_ids=["FAO_2017_VGSSM"],
+    )
+    verified = nodes.verify_claims([claim], ranked, site)[0]
+    assert verified.supported is True
+    assert verified.category == "traceable"
+    assert "traceable to the propagation result" in verified.support_note
 
 
 # =========================== 10. belief revision ===========================
@@ -530,13 +585,40 @@ def test_critic_passes_never_exceed_the_cap(graph):
     assert state["critic_passes"] <= MAX_CRITIC_PASSES
 
 
-def test_critic_routing_stops_at_the_cap(graph):
+def test_critic_routing_reads_the_critics_own_decision(graph):
+    """The router must not re-derive the cap from the pass counter.
+
+    It did, and the two disagreed on the final pass: critic_node evaluated
+    the predicate before its own increment and concluded it would revise
+    again, the router evaluated it after and ended the run, and the grounding
+    block was appended by neither.
+    """
     from src.agents.graph import _after_critic
 
+    assert _after_critic({"revision_pending": True}) == "synthesise"
+    assert _after_critic({"revision_pending": False}) == "__end__"
+    # Falls back to the claim-level check for a hand-assembled state.
     unsupported = [Claim(text="x", kind="citation", source_ids=[], supported=False)]
-    assert _after_critic({"claims": unsupported, "critic_passes": 0}) == "synthesise"
-    assert _after_critic({"claims": unsupported, "critic_passes": MAX_CRITIC_PASSES}) == "__end__"
-    assert _after_critic({"claims": [], "critic_passes": 0}) == "__end__"
+    assert _after_critic({"claims": unsupported}) == "synthesise"
+    assert _after_critic({"claims": []}) == "__end__"
+
+
+def test_the_final_draft_carries_the_grounding_block(graph):
+    """The last critic pass has to report coverage on the draft it checked."""
+    site = _deccan(slope=5.0)
+    state = _drafted_state(graph, site)
+
+    # Drive the loop the way the graph does, until the critic stops asking.
+    for _ in range(MAX_CRITIC_PASSES + 1):
+        result = critic_node(state)
+        state = {**state, **result}
+        if not nodes.needs_revision(state):
+            break
+        state = {**state, **nodes.synthesise_node(state)}
+
+    assert state["critic_passes"] <= MAX_CRITIC_PASSES
+    assert "GROUNDING:" in state["draft"], "the final draft did not report its coverage"
+    assert "traceable to propagation:" in state["draft"]
 
 
 # ======================= 13. API failure degrades well =======================

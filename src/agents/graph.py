@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
@@ -28,6 +29,7 @@ from langgraph.types import Command, interrupt
 
 from src.agents.nodes import (
     MAX_CRITIC_PASSES,
+    coverage_report,
     acquire_node,
     bind_node,
     belief_revision_node,
@@ -47,7 +49,7 @@ from src.graph.propagate import (
     Tradeoff,
 )
 from src.graph.schemas import Confidence, Measurement, Provenance, SiteState
-from src.retrieval.search import RetrievedChunk
+from src.retrieval.search import RetrievedChunk, warmup
 
 # Room for three question-and-answer cycles through intake and acquire, the
 # full diagnose-to-critic chain, and two critic revisions, without the
@@ -103,9 +105,10 @@ def _after_gap_analysis(state: ConversationState) -> str:
 
 
 def _after_critic(state: ConversationState) -> str:
-    if needs_revision(state) and state.get("critic_passes", 0) < MAX_CRITIC_PASSES:
-        return "synthesise"
-    return END
+    # The cap is enforced inside critic_node, which records its decision, so
+    # this reads that decision rather than re-deriving it from a count it
+    # would see at a different moment.
+    return "synthesise" if needs_revision(state) else END
 
 
 def build_agent_graph(checkpointer: MemorySaver | None = None):
@@ -206,23 +209,35 @@ DEMO_TURNS = [
 
 
 def run_demo(thread_id: str = "demo") -> None:
+    # Load the embedding model, the cross-encoder and the indexes before the
+    # conversation starts. They are lazily opened on first use, so without
+    # this the first turn that retrieves anything absorbs about forty seconds
+    # of model load and reports it as thinking time. The cost is real either
+    # way; charging it to startup rather than to a turn is the difference
+    # between a slow launch and an agent that appears to hang mid-sentence.
+    started = time.perf_counter()
+    warmup()
+    print(f"(warmed retrieval models and indexes in {time.perf_counter() - started:.1f}s)\n")
+
     conversation = Conversation(SiteState(site_id="demo_deccan"), thread_id=thread_id)
 
     for index, text in enumerate(DEMO_TURNS, start=1):
         print("=" * 78)
         print(f"TURN {index} - USER: {text}")
         print("=" * 78)
+        started = time.perf_counter()
         result = conversation.send(text)
+        elapsed = time.perf_counter() - started
 
         question = conversation.question(result)
         if question is not None:
-            print("\nAGENT (clarifying question):")
+            print(f"\nAGENT (clarifying question, {elapsed:.1f}s):")
             print(question)
             print()
             continue
 
         draft = result.get("draft")
-        print("\nAGENT:")
+        print(f"\nAGENT ({elapsed:.1f}s):")
         print(draft if draft else "(no draft produced)")
         print()
 
@@ -234,7 +249,10 @@ def run_demo(thread_id: str = "demo") -> None:
     print(f"asked about: {final.get('asked_about')}")
     print(f"critic passes: {final.get('critic_passes')}")
     coverage = final.get("grounding_coverage")
-    print(f"grounding coverage: {coverage:.0%}" if coverage is not None else "grounding: none")
+    if coverage is None:
+        print("grounding: none")
+    else:
+        print(coverage_report(final.get("claims") or [], coverage))
     print(f"episodic summary: {final.get('summary')}")
 
 

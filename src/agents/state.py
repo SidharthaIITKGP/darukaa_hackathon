@@ -52,11 +52,14 @@ class Claim(BaseModel):
     kind decides how it is verified, because the four kinds are not
     checkable the same way:
       quantitative  a number. Checked against the propagation result that
-                    produced it AND against retrieval on its cited sources,
-                    because no passage in the corpus contains a propagated
-                    Monte Carlo figure: a published effect size and a model
-                    output are different objects and only the first can be
-                    found in a document.
+                    produced it, and not against retrieval. No passage in
+                    the corpus contains a propagated Monte Carlo figure: a
+                    published effect size and a model output composed along
+                    a path are different objects, and asking retrieval about
+                    the second gets silence that then reads as a failure.
+                    The RELATIONSHIP behind the number is what the corpus is
+                    asked to back, and that is the causal and citation claims
+                    of the same recommendation.
       causal        a mechanism sentence. Checked by retrieval plus
                     entailment against the sources the edge cites.
       citation      a claim that a named source backs this recommendation.
@@ -70,6 +73,20 @@ class Claim(BaseModel):
     source_ids: list[str]
     supported: bool | None = None
     support_note: str | None = None
+    # How the verdict was reached, which is what makes a coverage figure
+    # readable. The four are not degrees of the same thing:
+    #   traceable   the figure is one the propagation engine produced for
+    #               this site. Its provenance is the graph, and no passage
+    #               could confirm it.
+    #   entailed    a retrieved passage from a cited source supports it.
+    #   softened    unsupported for a substantive reason: a figure from
+    #               nowhere, an unregistered source, or a passage that does
+    #               not bear the claim out.
+    #   corpus_gap  retrieval found nothing above the support floor. That is
+    #               a fact about this corpus, not about the claim, and it is
+    #               reported separately so it is not read as a failure of
+    #               rigour.
+    category: Literal["traceable", "entailed", "softened", "corpus_gap"] | None = None
 
 
 class Verdict(BaseModel):
@@ -126,6 +143,11 @@ class ConversationState(TypedDict, total=False):
     # claim texts the critic withdrew, so synthesise's next pass can remove
     # them and say that it did.
     withdrawn: list[str]
+    # whether the critic asked for another synthesise pass. Recorded rather
+    # than recomputed by the router, because the two evaluated the same
+    # predicate at different points either side of the pass counter's
+    # increment and disagreed on the final pass.
+    revision_pending: bool
     # value-of-information table from the last gap analysis: field to churn.
     # Reported so the choice of question is inspectable rather than magic.
     voi: dict[str, float]

@@ -364,11 +364,18 @@ def _break_cycles(sub: nx.MultiDiGraph) -> list[str]:
     Weakest = lowest evidence strength first, widest interval as a
     tiebreaker among edges of equal strength. Returns a log message per
     dropped edge; callers must surface these rather than swallow them.
+
+    The search starts from a sorted node list so that which cycle is found
+    first, and therefore which edge is dropped, does not depend on set
+    iteration order. The curated graph is currently acyclic, so this never
+    fires, which is exactly why it is worth pinning: a latent
+    order-dependence that only appears once someone adds a feedback edge is
+    harder to find than one that shows up today.
     """
     dropped: list[str] = []
     while True:
         try:
-            cycle_edges = nx.find_cycle(sub, orientation="original")
+            cycle_edges = nx.find_cycle(sub, source=sorted(sub.nodes), orientation="original")
         except nx.NetworkXNoCycle:
             break
         candidates = [(u, v, key, sub[u][v][key]["edge"]) for u, v, key, _direction in cycle_edges]
@@ -421,7 +428,14 @@ def forward_propagate(
     if intervention not in graph:
         return {}
 
-    reachable = {intervention} | nx.descendants(graph, intervention)
+    # Sorted, not a set. nx.descendants returns a set, and a subgraph built
+    # from one iterates its nodes in that set's order, which varies with
+    # PYTHONHASHSEED. That order becomes the subgraph's adjacency order,
+    # which becomes the order predecessors are visited below, which becomes
+    # the order samples are drawn from rng -- so the same seed produced
+    # different numbers between processes. Every ordering this function
+    # depends on is pinned explicitly from here on.
+    reachable = sorted({intervention} | nx.descendants(graph, intervention))
     sub = nx.MultiDiGraph(graph.subgraph(reachable))
 
     if not nx.is_directed_acyclic_graph(sub):
@@ -439,7 +453,15 @@ def forward_propagate(
         if v == intervention:
             continue
         mechanism_contributions: list[np.ndarray] = []
-        for u in sub.predecessors(v):
+        # Sorted rather than in adjacency order. Each predecessor draws from
+        # rng, so the visit order is part of what the seed means, and pinning
+        # it here does not depend on how the subgraph above happened to be
+        # built. Measured on the current graph either this sort or the sorted
+        # reachable above is enough on its own to make the demo reproducible;
+        # both are kept because they pin different links in the same chain
+        # and neither costs anything, so a future edge that breaks one does
+        # not silently reintroduce the bug.
+        for u in sorted(sub.predecessors(v)):
             if u not in delta:
                 continue
             keys = list(sub[u][v].keys())

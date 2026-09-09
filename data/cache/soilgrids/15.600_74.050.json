@@ -1,0 +1,157 @@
+{
+  "url": "https://rest.isric.org/soilgrids/v2.0/properties/query?lon=74.05&lat=15.6&depth=0-5cm&property=soc&property=phh2o&property=clay&property=sand&property=nitrogen&property=bdod&value=mean&value=uncertainty",
+  "fetched_at": "2026-09-09T10:36:41Z",
+  "response": {
+    "type": "Feature",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        74.05,
+        15.6
+      ]
+    },
+    "properties": {
+      "layers": [
+        {
+          "name": "bdod",
+          "unit_measure": {
+            "d_factor": 100,
+            "mapped_units": "cg/cm\u00b3",
+            "target_units": "kg/dm\u00b3",
+            "uncertainty_unit": ""
+          },
+          "depths": [
+            {
+              "range": {
+                "top_depth": 0,
+                "bottom_depth": 5,
+                "unit_depth": "cm"
+              },
+              "label": "0-5cm",
+              "values": {
+                "mean": 135,
+                "uncertainty": 8
+              }
+            }
+          ]
+        },
+        {
+          "name": "clay",
+          "unit_measure": {
+            "d_factor": 10,
+            "mapped_units": "g/kg",
+            "target_units": "%",
+            "uncertainty_unit": ""
+          },
+          "depths": [
+            {
+              "range": {
+                "top_depth": 0,
+                "bottom_depth": 5,
+                "unit_depth": "cm"
+              },
+              "label": "0-5cm",
+              "values": {
+                "mean": 344,
+                "uncertainty": 39
+              }
+            }
+          ]
+        },
+        {
+          "name": "nitrogen",
+          "unit_measure": {
+            "d_factor": 100,
+            "mapped_units": "cg/kg",
+            "target_units": "g/kg",
+            "uncertainty_unit": ""
+          },
+          "depths": [
+            {
+              "range": {
+                "top_depth": 0,
+                "bottom_depth": 5,
+                "unit_depth": "cm"
+              },
+              "label": "0-5cm",
+              "values": {
+                "mean": 232,
+                "uncertainty": 43
+              }
+            }
+          ]
+        },
+        {
+          "name": "phh2o",
+          "unit_measure": {
+            "d_factor": 10,
+            "mapped_units": "pH*10",
+            "target_units": "-",
+            "uncertainty_unit": ""
+          },
+          "depths": [
+            {
+              "range": {
+                "top_depth": 0,
+                "bottom_depth": 5,
+                "unit_depth": "cm"
+              },
+              "label": "0-5cm",
+              "values": {
+                "mean": 59,
+                "uncertainty": 6
+              }
+            }
+          ]
+        },
+        {
+          "name": "sand",
+          "unit_measure": {
+            "d_factor": 10,
+            "mapped_units": "g/kg",
+            "target_units": "%",
+            "uncertainty_unit": ""
+          },
+          "depths": [
+            {
+              "range": {
+                "top_depth": 0,
+                "bottom_depth": 5,
+                "unit_depth": "cm"
+              },
+              "label": "0-5cm",
+              "values": {
+                "mean": 357,
+                "uncertainty": 23
+              }
+            }
+          ]
+        },
+        {
+          "name": "soc",
+          "unit_measure": {
+            "d_factor": 10,
+            "mapped_units": "dg/kg",
+            "target_units": "g/kg",
+            "uncertainty_unit": ""
+          },
+          "depths": [
+            {
+              "range": {
+                "top_depth": 0,
+                "bottom_depth": 5,
+                "unit_depth": "cm"
+              },
+              "label": "0-5cm",
+              "values": {
+                "mean": 293,
+                "uncertainty": 43
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "query_time_s": 5.684961557388306
+  }
+}

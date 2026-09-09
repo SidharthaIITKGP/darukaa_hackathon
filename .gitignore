@@ -16,3 +16,7 @@ data/rasters/*.tif
 data/derived/qdrant/
 data/derived/*.faiss
 data/derived/bm25.pkl
+
+# Conversation memory written by the agent graph at runtime. Rebuilt by
+# talking to it, and a demo run should not commit its own scratch state.
+data/derived/sites/

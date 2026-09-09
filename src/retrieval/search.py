@@ -73,15 +73,39 @@ RRF_K = 60
 # modelling assumption in exactly the sense the methodology section means.
 RERANK_FLOOR = 0.30
 
-# Environment switch for deployment targets that cannot hold a cross-encoder
-# in memory. Streamlit Community Cloud gives about 1GB, and the smaller of
-# the two rerankers is still a 278M-parameter forward pass per candidate on
-# top of the embedding model and both indexes. With this set, no
-# cross-encoder is loaded at all and the fused RRF order is the final order.
+# Environment switch for deployment targets that cannot hold the model stack
+# in memory. Streamlit Community Cloud gives about 1GB, and torch plus
+# sentence-transformers plus the dense encoder measured 1011MB resident
+# before a single query ran, which does not fit with any reranker setting.
+#
+# With this set the deployment drops to BM25 alone: sentence_transformers is
+# never imported, no dense retrieval runs, and no cross-encoder loads. That
+# costs retrieval recall, and it is a property of the deployed instance only.
+# The full hybrid stack (dense + BM25 + cross-encoder) is what runs locally
+# and what produced the eval numbers.
 #
 # Read on every call rather than captured at import, so a host can set it
 # before the first query without controlling import order.
 LOW_MEMORY_ENV = "DARUKAA_LOW_MEMORY"
+
+# BM25 score below which a passage is discarded as noise when there is no
+# cross-encoder to ask.
+#
+# This floor is weaker than RERANK_FLOOR and the difference matters. Measured
+# on this corpus, BM25 does not separate topics the corpus covers from topics
+# it does not: "cover crops soil organic carbon" (covered) tops out at 10.3
+# while "contour bunding runoff" (no pooled effect size in the corpus) tops
+# out at 10.4 and "vetiver grass strips erosion" at 13.3, because BM25 rewards
+# a rare term whether or not the passage bears the claim out. A nonsense query
+# scores 6.0. So the only thing a BM25 threshold can honestly do is strip
+# noise, and 6.5 is set just above that nonsense floor to do exactly that and
+# nothing more.
+#
+# What separates covered from uncovered on a BM25-only deployment is therefore
+# the entailment check, not this number. Where no entailment model is
+# configured, check_entailment declines to claim support rather than reading a
+# high term-weight sum as evidence.
+BM25_SUPPORT_FLOOR = 6.5
 
 
 def low_memory() -> bool:
@@ -125,6 +149,9 @@ class RetrievedChunk(BaseModel):
     bm25_rank: int | None
     rrf_score: float
     rerank_score: float | None
+    # Raw BM25 score, kept because on a BM25-only deployment it is the only
+    # relevance signal there is. None when BM25 did not return this chunk.
+    bm25_score: float | None = None
     out_of_scope: bool
     scope_note: str | None
     # Set by bind_evidence when a passage was retrieved from outside the
@@ -197,6 +224,23 @@ def _bm25():
 
 @lru_cache(maxsize=2)
 def _reranker(precise: bool):
+    """Load a cross-encoder. Never reached under LOW_MEMORY_ENV.
+
+    The import sits after the guard rather than at module scope on purpose.
+    Importing CrossEncoder pulls the transformers model machinery into the
+    process whether or not a model is ever loaded, and on a 1GB host that
+    cost is charged before the first query is served. Skipping the call but
+    keeping the import would leave most of the memory saving on the table.
+
+    Raising rather than returning None is deliberate: every caller is already
+    behind a low_memory() check, so reaching here with it set is a bug in the
+    caller and should say so loudly rather than degrade quietly.
+    """
+    if low_memory():
+        raise RuntimeError(
+            f"{LOW_MEMORY_ENV} is set, so no cross-encoder may be loaded. "
+            "Callers must check low_memory() before asking for a reranker."
+        )
     from sentence_transformers import CrossEncoder
 
     return CrossEncoder(RERANK_MODEL_PRECISE if precise else RERANK_MODEL_FAST)
@@ -251,7 +295,8 @@ def _dense_candidates(
 
 def _bm25_candidates(
     query: str, tier: str | None, tags: list[str] | None, source_ids: list[str] | None
-) -> list[str]:
+) -> list[tuple[str, float]]:
+    """Top BM25 chunk ids with their scores, best first."""
     bm25, chunk_ids, all_source_ids, tiers, all_tags = _bm25()
     scores = bm25.get_scores(tokenize(query))
     allowed = [
@@ -260,7 +305,7 @@ def _bm25_candidates(
         if _passes_filter(tiers[i], all_tags[i], all_source_ids[i], tier, tags, source_ids)
     ]
     allowed.sort(key=lambda i: scores[i], reverse=True)
-    return [chunk_ids[i] for i in allowed[:CANDIDATE_DEPTH] if scores[i] > 0]
+    return [(chunk_ids[i], float(scores[i])) for i in allowed[:CANDIDATE_DEPTH] if scores[i] > 0]
 
 
 class SearchTiming(BaseModel):
@@ -358,12 +403,18 @@ def _search_uncached(
 ) -> tuple[list[RetrievedChunk], SearchTiming]:
     started = time.perf_counter()
 
+    # Dense retrieval is the whole reason torch and sentence-transformers are
+    # in the process, so on a low memory deployment it is skipped rather than
+    # merely made cheaper. Fusion then has one ranking to fuse, which is BM25
+    # order, and rrf_score below reduces to a monotone function of that rank.
     dense_start = time.perf_counter()
-    dense_payloads = _dense_candidates(query, tier, tags, source_ids)
+    dense_payloads = [] if low_memory() else _dense_candidates(query, tier, tags, source_ids)
     dense_ms = (time.perf_counter() - dense_start) * 1000
 
     bm25_start = time.perf_counter()
-    bm25_ids = _bm25_candidates(query, tier, tags, source_ids)
+    bm25_scored = _bm25_candidates(query, tier, tags, source_ids)
+    bm25_ids = [cid for cid, _ in bm25_scored]
+    bm25_scores = dict(bm25_scored)
     bm25_ms = (time.perf_counter() - bm25_start) * 1000
 
     rrf_start = time.perf_counter()
@@ -408,6 +459,7 @@ def _search_uncached(
             bm25_rank=bm25_rank.get(cid),
             rrf_score=fused[cid],
             rerank_score=None,
+            bm25_score=bm25_scores.get(cid),
             out_of_scope=False,
             scope_note=None,
         )
@@ -467,17 +519,15 @@ def has_support(chunks: list[RetrievedChunk]) -> bool:
     been scored against the query by anything that could answer this, so they
     count as no support.
 
-    Under LOW_MEMORY_ENV there is no cross-encoder to ask, so the question is
-    answered by retriever agreement instead: a chunk that both the dense
-    retriever and BM25 put in their candidate pools was found on two
-    independent signals, which is the same reasoning fusion already rests on.
-    It is a weaker test than a cross-encoder score and it is not the same
-    quantity, so it is deliberately not written into rerank_score, where it
-    would be read as one. Callers that report grounding should say which rule
-    produced it.
+    Under LOW_MEMORY_ENV there is no cross-encoder and no dense retriever, so
+    the question is answered against BM25_SUPPORT_FLOOR instead. That is a
+    weaker test on a different and uncalibrated quantity, so the BM25 score is
+    deliberately not written into rerank_score, where it would be read as a
+    cross-encoder score. Callers that report grounding should say which rule
+    produced the verdict.
     """
     if low_memory():
-        return any(c.dense_rank is not None and c.bm25_rank is not None for c in chunks)
+        return any(c.bm25_score is not None and c.bm25_score >= BM25_SUPPORT_FLOOR for c in chunks)
     return any(c.rerank_score is not None and c.rerank_score >= RERANK_FLOOR for c in chunks)
 
 
@@ -490,8 +540,10 @@ def warmup(precise: bool = False) -> None:
     """
     _qdrant()
     _bm25()
-    embedding_model()
+    # The dense encoder is what pulls torch into the process. On a low memory
+    # deployment it is never loaded, so it is never warmed either.
     if not low_memory():
+        embedding_model()
         _reranker(precise)
     _search_uncached("soil organic carbon", 3, None, None, None, True, precise)
 

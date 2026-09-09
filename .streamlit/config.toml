@@ -4,6 +4,12 @@
 
 [server]
 headless = true
+# The default watcher walks every imported module's source tree on each
+# rerun, which for transformers and torch is thousands of files. It costs
+# real memory, and it is what surfaces torchvision import tracebacks that
+# have nothing to do with this app. A deployed build never edits its own
+# source, so there is nothing for it to watch.
+fileWatcherType = "none"
 # CORS and XSRF protection are left at their secure defaults. Nothing here
 # accepts a file upload, and the corpus passages shown under a recommendation
 # are text, so the default message limits are untouched too.

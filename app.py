@@ -13,11 +13,14 @@ being assessed here and a chat transcript alone hides it.
 
 Deployment notes, which drive most of the structure below:
 
-  Memory   Streamlit Community Cloud gives roughly 1GB. The precise
-           cross-encoder, bge-reranker-v2-m3, is 2.2GB on its own and cannot
-           load there at all, so precise reranking is never requested. With
-           DARUKAA_LOW_MEMORY=1 no cross-encoder loads at all and retrieval
-           falls back to the fused RRF order.
+  Memory   Streamlit Community Cloud gives roughly 1GB. Measured here, torch
+           plus sentence-transformers plus the dense encoder reach 1011MB
+           resident before a single query runs, so no reranker setting makes
+           the hybrid stack fit. With DARUKAA_LOW_MEMORY=1 the deployment
+           drops to BM25 alone: sentence_transformers is never imported and
+           no dense retrieval or cross-encoder runs. That costs recall on the
+           deployed instance only. The full hybrid stack runs locally and is
+           what produced the eval numbers.
   Locking  A local Qdrant holds an exclusive lock on its storage directory,
            and Streamlit serves concurrent sessions from one process. Every
            model and index is therefore built inside @st.cache_resource so
@@ -95,6 +98,11 @@ from src.graph.propagate import (  # noqa: E402
 )
 from src.retrieval.search import RERANK_FLOOR, low_memory  # noqa: E402
 
+# Streamlit Community Cloud kills the container at roughly 1GB. Anything above
+# this leaves no headroom for a second concurrent session, so it is the number
+# worth watching rather than the hard limit.
+RSS_BUDGET_MB = 700
+
 # Opening lines for the three preset sites. Each states the concern in the
 # user's own terms plus the measurements a landholder would actually know,
 # which is what the intake node parses.
@@ -118,6 +126,21 @@ PRESET_PROMPTS: dict[str, tuple[str, str]] = {
         "Coordinates 15.60, 74.05.",
     ),
 }
+
+
+def rss_mb() -> float | None:
+    """Resident set size of this process in MB, or None if unavailable.
+
+    Reported rather than estimated. The memory ceiling is the binding
+    constraint on this deployment, and a number on screen is the difference
+    between knowing the app fits and assuming it does.
+    """
+    try:
+        import psutil
+
+        return psutil.Process().memory_info().rss / (1024 * 1024)
+    except Exception:  # noqa: BLE001 - a missing reading is not a failed app
+        return None
 
 
 # ============================ cached resources =============================
@@ -368,12 +391,22 @@ def draw_sidebar() -> str | None:
             st.text("\n".join(render.methodology_lines()[1:]))
 
         st.divider()
+        st.subheader("Process")
         st.caption(f"Model: `{model_name()}`")
+        resident = rss_mb()
+        if resident is None:
+            st.caption("Memory: psutil not installed, so RSS is not reported.")
+        else:
+            st.caption(f"Memory (RSS): {resident:.0f} MB of a ~1GB host")
+            if resident > RSS_BUDGET_MB:
+                st.warning(
+                    f"RSS is above the {RSS_BUDGET_MB}MB working budget. A second "
+                    "concurrent session on a 1GB host would likely be killed."
+                )
         if low_memory():
-            st.caption(
-                "Low memory mode: no cross-encoder. Retrieval returns the fused RRF "
-                "order and support is judged on retriever agreement, which is a "
-                "weaker test than a cross-encoder score."
+            st.info(
+                "Deployed build: BM25 retrieval only (1GB memory limit). Full hybrid "
+                "dense + BM25 + cross-encoder runs locally; see README."
             )
 
     return clicked

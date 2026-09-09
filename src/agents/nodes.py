@@ -59,7 +59,14 @@ from src.graph.schemas import (
     implausible_combinations,
 )
 from src.retrieval.bind import bind_evidence
-from src.retrieval.search import RERANK_FLOOR, RetrievedChunk, has_support, low_memory, search
+from src.retrieval.search import (
+    BM25_SUPPORT_FLOOR,
+    RERANK_FLOOR,
+    RetrievedChunk,
+    has_support,
+    low_memory,
+    search,
+)
 
 _ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = _ROOT / "data" / "cache"
@@ -1308,8 +1315,9 @@ def _evidence_lines(state: ConversationState) -> list[str]:
         return []
     lines = ["RETRIEVED EVIDENCE"]
     ordering = (
-        "fused by reciprocal rank over a dense retriever and BM25, with no cross-encoder "
-        "on this deployment"
+        "ranked by BM25 alone. This deployment runs without dense retrieval or a "
+        "cross-encoder to stay inside its memory limit, so recall is lower here than "
+        "in the hybrid stack the evaluation used"
         if low_memory()
         else "reranked by a cross-encoder"
     )
@@ -1329,12 +1337,12 @@ def _evidence_lines(state: ConversationState) -> list[str]:
             )
             continue
         for chunk in chunks:
-            # Without a cross-encoder there is no score to threshold on, so
-            # the retriever agreement that has_support already accepted is
-            # what selects a passage. Filtering on a missing score here would
+            # Without a cross-encoder there is no rerank score to threshold
+            # on, so the BM25 floor that has_support already applied is what
+            # selects a passage. Filtering on the missing score here would
             # quote nothing at all on a low memory deployment.
             if low_memory():
-                if chunk.dense_rank is None or chunk.bm25_rank is None:
+                if chunk.bm25_score is None or chunk.bm25_score < BM25_SUPPORT_FLOOR:
                     continue
             elif chunk.rerank_score is None or chunk.rerank_score < RERANK_FLOOR:
                 continue
@@ -1347,11 +1355,12 @@ def _evidence_lines(state: ConversationState) -> list[str]:
                 marks.append("out of scope")
             mark = f" [{', '.join(marks)}]" if marks else ""
             lines.append(f"    - {chunk.citation} p{chunk.pages}{mark}")
-            score = (
-                f"score {chunk.rerank_score:.2f}"
-                if chunk.rerank_score is not None
-                else "both retrievers"
-            )
+            if chunk.rerank_score is not None:
+                score = f"rerank {chunk.rerank_score:.2f}"
+            elif chunk.bm25_score is not None:
+                score = f"BM25 {chunk.bm25_score:.1f}"
+            else:
+                score = "unscored"
             lines.append(f"      {score}: {excerpt}")
             if chunk.scope_note:
                 lines.append(f"      scope: {chunk.scope_note}")
@@ -1829,7 +1838,7 @@ def check_entailment(claim: Claim, chunks: list[RetrievedChunk]) -> Verdict:
         return Verdict(verdict="unsupported", reason="Retrieval returned nothing for this claim.")
     if not has_support(chunks):
         basis = (
-            "was returned by both retrievers"
+            f"reached the BM25 support floor of {BM25_SUPPORT_FLOOR:g}"
             if low_memory()
             else "cleared the cross-encoder support floor"
         )
@@ -1851,14 +1860,27 @@ def check_entailment(claim: Claim, chunks: list[RetrievedChunk]) -> Verdict:
         # what it is rather than dressed up as a score, and never inferred as
         # a number, which would be a figure from nowhere.
         scores = [c.rerank_score for c in chunks if c.rerank_score is not None]
+        if low_memory():
+            # On a BM25-only deployment there is nothing here that could
+            # establish support. A cross-encoder score above RERANK_FLOOR is
+            # evidence that a passage answers the query; a BM25 score is a sum
+            # of term weights that an uncovered topic can top purely by using
+            # a rare word, as contour bunding and vetiver both do on this
+            # corpus. With no entailment model either, the honest verdict is
+            # that the claim could not be checked, not that it was supported.
+            return Verdict(
+                verdict="unsupported",
+                reason=(
+                    "This deployment retrieves with BM25 alone and no entailment model is "
+                    f"configured ({model_name()} unavailable), so nothing here can establish "
+                    "that the passage supports the claim. BM25 rank is not evidence of "
+                    "support. Reported as unchecked rather than counted as grounded."
+                ),
+            )
         if scores:
             evidence = f"Best retrieved passage scores {max(scores):.2f}, above the support floor."
         else:
-            evidence = (
-                "The supporting passage was returned by both the dense retriever and BM25, "
-                "which is retriever agreement rather than a relevance score; no cross-encoder "
-                "ran on this deployment."
-            )
+            evidence = "A passage was retrieved but carries no relevance score."
         return Verdict(
             verdict="supported",
             reason=(

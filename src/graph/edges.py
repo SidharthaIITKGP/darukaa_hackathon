@@ -27,6 +27,37 @@ from src.graph.schemas import (
 
 DERIVED_GRAPH_PATH = "data/derived/causal_graph.json"
 
+# ============================== KNOWN MODELLING GAPS ==============================
+#
+# Gaps identified and deliberately left open. Recorded here because an
+# unrecorded gap is indistinguishable from an oversight.
+#
+# 1. Cover crops carry no water-competition edge, while alley cropping does.
+#    alley_cropping -> plant_available_water and boundary_tree_planting ->
+#    plant_available_water both carry negative edges gated to semi-arid and
+#    arid zones, representing trees drawing on the same shallow root-zone
+#    store the crop uses. A cover crop transpires and competes for that same
+#    water, so the equivalent edges (legume_cover_crop and
+#    non_legume_cover_crop -> plant_available_water, negative, gated to
+#    semi-arid and arid) should exist and do not.
+#
+#    The asymmetry means the graph likely OVERSTATES cover crops in dry
+#    settings, particularly below about 300mm where the rainfall precondition
+#    on the carbon edges attenuates their benefit but nothing debits their
+#    water cost. On the semi-arid Deccan demo site this is the difference
+#    between a cover crop and a water-harvesting structure heading the
+#    recommendation.
+#
+#    Deferred rather than added, for two reasons. No published effect size
+#    was available: the corpus covers tree-crop competition (IPCC 2019 SRCCL
+#    Ch. 6 response-option tables) but not cover-crop water use as a
+#    quantified adverse effect, so the edge would have been an own estimate at
+#    MECHANISTIC strength. And it would have been decisive rather than
+#    marginal, flipping the headline recommendation on the flagship demo site.
+#    Changing what the system recommends on the strength of an unpublished
+#    guess is a worse trade than leaving a known asymmetry documented. Add the
+#    edge when a published estimate exists to anchor it.
+
 EDGES: list[CausalEdge] = []
 
 # ============================= SECTION A: QUANTIFIED EDGES =============================
@@ -62,14 +93,22 @@ EDGES.append(
             ),
             EvidenceRef(source_id="McClelland_2020_covercrops_SOC", role="corroborating"),
         ],
-        conditions=Conditions(land_use=["cropland"]),
+        conditions=Conditions(land_use=["cropland"], rainfall_mm=(300, 3000), slope_pct=(0, 8)),
         mechanism=(
             "Legume cover crops fix atmospheric nitrogen and exude labile carbon compounds "
             "from their roots, feeding soil microbial biomass that stabilises new organic "
             "matter. Their above and below-ground residues add fresh carbon input beyond "
             "what the cash crop alone contributes. Joshi 2023 reports +8.6-33.7% at 0-15cm "
             "under conventional tillage versus +0.3-10.5% under no-tillage; the graph "
-            "models the pooled effect since tillage state is not a node here."
+            "models the pooled effect since tillage state is not a node here. Gated on "
+            "rainfall 300-3000mm/yr: the whole effect runs through cover-crop biomass, and "
+            "below roughly 300mm establishment is unreliable enough that there is often no "
+            "biomass to speak of. The bound is an own judgement on establishment risk, not "
+            "a published threshold. Also gated on slope 0-8%: above 8% the topsoil holding "
+            "this carbon is exported faster than cover-crop residue accumulates it, which is "
+            "the same threshold the erosion diagnosis uses, and the source meta-analyses "
+            "measured predominantly gentle arable land. An own judgement, not a published "
+            "threshold."
         ),
     )
 )
@@ -84,7 +123,7 @@ EDGES.append(
         lag_years=(2, 4),
         strength=EvidenceStrength.META_ANALYSIS,
         confidence=Confidence.LOW,
-        conditions=Conditions(land_use=["cropland"]),
+        conditions=Conditions(land_use=["cropland"], rainfall_mm=(300, 3000), slope_pct=(0, 8)),
         evidence=[
             EvidenceRef(source_id="Joshi_2023_covercrops_SOC", role="primary"),
             EvidenceRef(source_id="McClelland_2020_covercrops_SOC", role="corroborating"),
@@ -93,7 +132,10 @@ EDGES.append(
             "Non-legume cover crops (grasses, brassicas) add above and below-ground biomass "
             "carbon in the same way as legume cover crops, but without symbiotic nitrogen "
             "fixation the carbon input is lower and less readily stabilised, giving a "
-            "narrower and lower expected gain than the legume case."
+            "narrower and lower expected gain than the legume case. Gated on rainfall "
+            "300-3000mm/yr for the same establishment reason as the legume edge, and on "
+            "slope 0-8% for the same carbon-export reason. Own judgements rather than "
+            "published thresholds."
         ),
     )
 )
@@ -161,10 +203,14 @@ EDGES.append(
             EvidenceRef(source_id="Mupepele_2021_agroforestry_biodiv", role="contradicting"),
             EvidenceRef(source_id="Boinot_2022_agroforestry_critique", role="critique"),
         ],
+        conditions=Conditions(rainfall_mm=(300, 3000)),
         mechanism=(
             "Tree rows add structural and floral resource diversity that can support more "
             "species, but the effect is contested in the literature and depends heavily on "
-            "system age, tree species mix, and study methodology."
+            "system age, tree species mix, and study methodology. Gated on rainfall "
+            "300-3000mm/yr: the resource diversity is the tree rows themselves, and below "
+            "roughly 300mm their establishment without irrigation is unreliable. An own "
+            "judgement on establishment risk, not a published threshold."
         ),
     )
 )
@@ -258,9 +304,16 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
         evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6", role="primary")],
+        conditions=Conditions(rainfall_mm=(0, 1200)),
         mechanism=(
             "Greater plant-available water relieves drought stress and supports fuller leaf "
-            "expansion and canopy closure across the growing season."
+            "expansion and canopy closure across the growing season. Gated on rainfall up "
+            "to 1200mm/yr: the mechanism is relief of a water shortage, so it only fires "
+            "where water is what limits the canopy. Above roughly 1200mm light and nutrient "
+            "supply bind instead, and adding root-zone water buys little extra cover. This "
+            "is the ceiling that stops water-holding interventions dominating humid sites. "
+            "An own judgement on where the constraint changes hands, not a published "
+            "threshold."
         ),
     )
 )
@@ -313,9 +366,17 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
         evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
+        conditions=Conditions(ph=(5.0, 8.0)),
         mechanism=(
             "Soil organic carbon is the substrate microbes metabolise, so a larger carbon "
-            "pool supports a larger standing microbial biomass."
+            "pool supports a larger standing microbial biomass. Gated on pH 5.0-8.0: "
+            "microbial activity falls away sharply outside that band, so on a strongly acid "
+            "or calcareous alkaline soil the extra substrate is not metabolised into "
+            "biomass at anything like the same rate. The band is an own judgement on where "
+            "activity holds up, not a published threshold. This is the ONLY pH gate on the "
+            "microbial and nutrient-cycling chain: the downstream links describe the same "
+            "pH-sensitive activity, so gating each of them would apply one constraint three "
+            "times over and zero the chain instead of attenuating it."
         ),
     )
 )
@@ -333,7 +394,12 @@ EDGES.append(
         evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Microbial biomass is the engine that mineralises organic matter into "
-            "plant-available forms; a larger microbial pool turns over nutrients faster."
+            "plant-available forms; a larger microbial pool turns over nutrients faster. "
+            "Deliberately NOT pH gated, although the mineralisation it describes is pH "
+            "sensitive: that one fact is already gated upstream at soil_organic_carbon -> "
+            "microbial_biomass_carbon, and these edges are in series, so gating it here as "
+            "well would apply a single constraint twice and collapse the chain to nothing "
+            "rather than attenuate it."
         ),
     )
 )
@@ -351,7 +417,10 @@ EDGES.append(
         evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Faster mineralisation of organic nitrogen pools directly increases the "
-            "plant-available nitrogen fraction in the root zone."
+            "plant-available nitrogen fraction in the root zone. Not pH gated, for the same "
+            "reason as the microbial_biomass_carbon -> nutrient_cycling_rate edge: the pH "
+            "sensitivity of this chain is gated once at its head, and repeating it at every "
+            "link would multiply one constraint by the length of the chain."
         ),
     )
 )
@@ -385,11 +454,15 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
         evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
-        conditions=Conditions(slope_pct=(2, 60)),
+        conditions=Conditions(slope_pct=(2, 25)),
         mechanism=(
             "Contour bunds intercept overland flow and pond it behind the bund, extending "
             "the residence time water has to infiltrate instead of running off downslope. "
-            "The effect only applies where there is meaningful slope for runoff to occur."
+            "The effect only applies where there is meaningful slope for runoff to occur. "
+            "Gated on slope 2-25%: below 2% there is little overland flow to intercept and "
+            "the bund does much less, and above 25% an earthen bund is unstable and tends "
+            "to breach rather than pond. Both bounds are own judgements on where the "
+            "structure works, not published thresholds."
         ),
     )
 )
@@ -414,11 +487,13 @@ EDGES.append(
                 ),
             )
         ],
-        conditions=Conditions(slope_pct=(2, 60)),
+        conditions=Conditions(slope_pct=(2, 25)),
         mechanism=(
             "By slowing overland flow velocity and trapping sediment behind the bund, "
             "contour bunding reduces the volume of soil detached and transported off the "
-            "field."
+            "field. Gated on slope 2-25%: below 2% there is little water erosion to "
+            "prevent, and above 25% the bund itself is unstable. Own judgements, not "
+            "published thresholds."
         ),
     )
 )
@@ -434,9 +509,12 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
         evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
+        conditions=Conditions(rainfall_mm=(300, 3000)),
         mechanism=(
             "Woody hedgerows add a permanent vertical structural element and edge habitat "
-            "that a monoculture field margin lacks."
+            "that a monoculture field margin lacks. Gated on rainfall 300-3000mm/yr: the "
+            "structure is living woody biomass, and below roughly 300mm hedge establishment "
+            "without irrigation is unreliable. An own judgement, not a published threshold."
         ),
     )
 )
@@ -452,9 +530,13 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
         evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
+        conditions=Conditions(rainfall_mm=(300, 3000)),
         mechanism=(
             "Hedgerows act as linear corridors linking otherwise isolated patches of "
-            "semi-natural habitat, allowing species to move between them."
+            "semi-natural habitat, allowing species to move between them. Gated on rainfall "
+            "300-3000mm/yr on the same establishment grounds as the structural-heterogeneity "
+            "edge: a hedge that does not establish is not a corridor. An own judgement, not "
+            "a published threshold."
         ),
     )
 )
@@ -584,10 +666,14 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
         evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
+        conditions=Conditions(slope_pct=(0, 15)),
         mechanism=(
             "A farm pond captures runoff that would otherwise leave the catchment and holds "
             "it in contact with the soil, where it can percolate downward and recharge the "
-            "water table."
+            "water table. Gated on slope 0-15%: unlike a bund a pond needs no gradient to "
+            "work, so there is no lower bound, but above roughly 15% the excavation and "
+            "embankment needed to hold a useful volume stop being practical. An own "
+            "judgement, not a published threshold."
         ),
     )
 )
@@ -824,10 +910,14 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
         evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
+        conditions=Conditions(slope_pct=(2, 30)),
         mechanism=(
             "A check dam slows ephemeral stream flow and ponds water behind the structure, "
             "increasing the time and wetted area over which water can percolate down to the "
-            "aquifer."
+            "aquifer. Gated on slope 2-30%: it needs a drainage line with enough gradient to "
+            "concentrate flow, and above roughly 30% flows are energetic enough that a small "
+            "structure is undercut rather than ponding. Own judgements, not published "
+            "thresholds."
         ),
     )
 )
@@ -843,11 +933,45 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
         evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
-        conditions=Conditions(slope_pct=(2, 60)),
+        conditions=Conditions(slope_pct=(2, 25)),
         mechanism=(
             "Trenches dug along the contour intercept overland flow and hold it in place "
             "long enough to infiltrate rather than run off, similar in principle to contour "
-            "bunding but with greater storage volume per unit length."
+            "bunding but with greater storage volume per unit length. Gated on slope 2-25%: "
+            "below 2% there is little overland flow to intercept, and above 25% trench "
+            "spoil and side walls are unstable. Own judgements, not published thresholds."
+        ),
+    )
+)
+
+EDGES.append(
+    CausalEdge(
+        source="contour_trenching",
+        target="erosion_rate",
+        sign="-",
+        metric=EffectMetric.PERCENT_CHANGE,
+        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.2),
+        lag_years=(0, 2),
+        strength=EvidenceStrength.MECHANISTIC,
+        confidence=Confidence.MODERATE,
+        evidence=[
+            EvidenceRef(
+                source_id="FAO_2017_VGSSM",
+                role="primary",
+                note=(
+                    "Supports direction only (contour trenching reduces erosion). The "
+                    "interval is an own estimate, not a published figure."
+                ),
+            )
+        ],
+        conditions=Conditions(slope_pct=(2, 25)),
+        mechanism=(
+            "A contour trench breaks the slope into shorter runs, so overland flow is "
+            "intercepted before it accumulates the volume and velocity that detach soil, "
+            "and the sediment it already carries settles in the trench instead of leaving "
+            "the field. Gated on slope 2-25% for the same reasons as the infiltration edge: "
+            "little erosion to prevent below 2%, unstable trench walls above 25%. Own "
+            "judgements, not published thresholds."
         ),
     )
 )
@@ -863,11 +987,14 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
         evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
-        conditions=Conditions(slope_pct=(2, 60)),
+        conditions=Conditions(slope_pct=(3, 40)),
         mechanism=(
             "Dense, fibrous vetiver root mats and stiff above-ground stems form a living "
             "barrier along the contour that slows runoff velocity and traps sediment, "
-            "reducing the soil mass that leaves the field."
+            "reducing the soil mass that leaves the field. Gated on slope 3-40%: below 3% "
+            "there is little water erosion for a barrier to prevent, while the upper bound "
+            "is set higher than for earthworks because a living hedge holds on ground where "
+            "an earthen bund would breach. Own judgements, not published thresholds."
         ),
     )
 )
@@ -883,11 +1010,15 @@ EDGES.append(
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
         evidence=[EvidenceRef(source_id="IPCC_2022_AR6_WG3_Ch7", role="primary")],
-        conditions=Conditions(land_use=["cropland"]),
+        conditions=Conditions(land_use=["cropland"], rainfall_mm=(300, 3000), slope_pct=(0, 8)),
         mechanism=(
             "Growing two crop species together increases total root biomass and ground "
             "cover relative to a monoculture of either alone, adding more carbon input to "
-            "the soil over the season."
+            "the soil over the season. Gated on rainfall 300-3000mm/yr: the added carbon is "
+            "the companion crop's biomass, and below roughly 300mm two crops compete for "
+            "water that will not support both. Also gated on slope 0-8%, above which that "
+            "carbon is exported faster than it accumulates. Own judgements, not published "
+            "thresholds."
         ),
     )
 )

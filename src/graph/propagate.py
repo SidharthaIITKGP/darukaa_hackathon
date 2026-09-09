@@ -20,6 +20,7 @@ from __future__ import annotations
 import itertools
 import warnings
 from pathlib import Path
+from typing import Literal
 
 import networkx as nx
 import numpy as np
@@ -98,16 +99,35 @@ CONVERGENCE_SOURCE_CAP = 2
 # assumptions. A tradeoff landing on the site's binding constraint (or on a
 # variable upstream of it) is weighted 4x the ordinary one, because it does
 # not merely offset the gains: it holds shut the gate everything downstream
-# has to pass through. The boost is the same idea applied with the opposite
-# sign, so relieving the binding constraint is rewarded on the same axis
-# that working against it is penalised.
+# has to pass through. The reward for relieving that constraint is not the
+# mirror of this penalty and is deliberately not on this axis at all: it is
+# the tier partition in rank_interventions, because Liebig's law of the
+# minimum is a gate and not a weighting.
 TRADEOFF_PENALTY_WEIGHT = 0.5
 LIMITING_FACTOR_PENALTY_WEIGHT = 2.0
-LIMITING_FACTOR_OBJECTIVE_BOOST = 3.0
 
 _AGREEING_ROLES = ("primary", "corroborating")
 
 _QUALITY_RANK = {Confidence.LOW: 0, Confidence.MODERATE: 1, Confidence.HIGH: 2}
+
+
+def _improvement_direction(variable: str, site: SiteState) -> float:
+    """Which way `variable` has to move for this site to be better off.
+
+    Resolved per site rather than per variable because soil_ph has no fixed
+    answer: an acid soil needs pH raised and an alkaline one needs it
+    lowered, so a single sign in CONSTRAINT_DIRECTION would reward liming a
+    pH 8.6 soil. Where the site's own pH is unknown the direction is
+    genuinely undetermined, and 0.0 is returned so that nothing can qualify
+    as addressing it on a guess.
+    """
+    if variable in CONSTRAINT_DIRECTION:
+        return CONSTRAINT_DIRECTION[variable]
+    if variable == "soil_ph":
+        if site.ph is None or site.ph.value is None:
+            return 0.0
+        return 1.0 if site.ph.value < 7.0 else -1.0
+    return 1.0
 
 
 def _convergence_factor(n_agreeing: int) -> float:
@@ -124,6 +144,29 @@ DEFAULT_OBJECTIVES: dict[str, float] = {
     "crop_yield": 0.15,
     "pollinator_abundance": 0.1,
 }
+
+# Which way a variable has to move for the site to be better off. Needed
+# because "addresses the binding constraint" is a claim about direction, not
+# just about a path existing: a path from an intervention to erosion_rate
+# that RAISES erosion is not addressing an erosion constraint, it is making
+# it worse.
+#
+# Every variable in DEFAULT_OBJECTIVES is higher-is-better and so has
+# direction +1 implicitly. soil_ph is absent because its direction is a
+# property of the site rather than of the variable: raising pH helps an acid
+# soil and harms an alkaline one. _improvement_direction resolves that from
+# the site's own pH instead of guessing a fixed sign here.
+CONSTRAINT_DIRECTION: dict[str, float] = {
+    "erosion_rate": -1.0,
+    "nutrient_cycling_rate": 1.0,
+    "habitat_connectivity": 1.0,
+}
+
+# Smallest movement on the binding constraint that counts as addressing it.
+# A modelling assumption. Below this an intervention has a path to the
+# constraint on paper but does nothing about it in practice, and letting it
+# into tier 1 would promote it above interventions that genuinely help.
+TIER_1_MIN_EFFECT = 0.01
 
 
 def _source_scopes() -> dict[str, str]:
@@ -211,7 +254,32 @@ class RankedIntervention(BaseModel):
     effects: dict[str, PropagationResult]
     tradeoffs: list[Tradeoff]
     n_variables_touched: int
+    # Two related fields, deliberately not collapsed, because the gap between
+    # them is what makes a tier assignment auditable:
+    #   limiting_factor_addressed  -- a causal path from this intervention
+    #                                 reaches the binding constraint. Says
+    #                                 nothing about direction or size, so a
+    #                                 path that moves the constraint the
+    #                                 wrong way, or by 0.1%, still sets it.
+    #   addresses_limiting_factor  -- that path also moves the constraint in
+    #                                 the direction the site needs, by at
+    #                                 least TIER_1_MIN_EFFECT. This is the
+    #                                 one that gates tier 1.
+    # An intervention with the first True and the second False is the
+    # interesting case: the mechanism exists on paper and does nothing here.
     limiting_factor_addressed: bool
+    addresses_limiting_factor: bool
+    # Liebig's law of the minimum as a gate, not a weighting. Tier 1
+    # addresses the site's binding constraint; tier 2 does not. Every tier 1
+    # intervention ranks above every tier 2 intervention regardless of score,
+    # because a gain downstream of a constraint that is still shut cannot be
+    # realised.
+    tier: Literal[1, 2]
+    # Propagated p50 on the site's binding constraint, signed as the variable
+    # moves (negative for a reduction in erosion). None when no path reaches
+    # the constraint. This is what orders tier 1, so it is reported rather
+    # than left implicit in the ordering.
+    constraint_movement: float | None
     # True when a tradeoff whose preconditions this site meets lands on the
     # site's binding constraint, or on a variable upstream of it. The
     # intervention may still be sound elsewhere and later here, which is why
@@ -699,13 +767,53 @@ def find_tradeoffs(
     return tradeoffs
 
 
+def _missing_data_note(site: SiteState) -> str:
+    """Names the measurements a diagnosis had to do without, or an empty string.
+
+    A fall-through diagnosis rests on the absence of a trigger, which is only
+    as strong as the data that could have triggered one. Saying which
+    measurements were missing keeps that visible instead of presenting a
+    default as a finding.
+    """
+    wanted = ("soil_organic_carbon_pct", "annual_rainfall_mm", "ph", "slope_pct", "edge_density")
+    absent = [name for name in wanted if getattr(site, name) is None]
+    if not absent:
+        return ""
+    return " No measurement available for " + ", ".join(absent) + ", so a trigger may have been missed."
+
+
 def limiting_factor(site: SiteState) -> tuple[str, str]:
-    """Liebig's law of the minimum: which single variable most constrains this site."""
+    """Liebig's law of the minimum: which single variable most constrains this site.
+
+    Syndromes are evaluated in a fixed order and the first match wins. The
+    order encodes priority, not likelihood: a constraint that exports the
+    others has to be relieved before the things it exports are worth
+    building, so erosion is tested ahead of fertility, and fertility ahead
+    of biodiversity.
+
+    Always returns a variable and a reason, never None and never an empty
+    diagnosis. A site always has something that binds hardest; where no
+    threshold is crossed the fall-through says which variable it settles on
+    and admits how little that rests on.
+    """
     rainfall = site.annual_rainfall_mm.value if site.annual_rainfall_mm else None
     soc = site.soil_organic_carbon_pct.value if site.soil_organic_carbon_pct else None
     ph = site.ph.value if site.ph else None
+    slope = site.slope_pct.value if site.slope_pct else None
     edge_density = site.edge_density
 
+    # 1. Erosion first. Everything below is a stock being built up in the
+    # profile, and on steep wet ground that stock leaves the field faster
+    # than it accumulates, so relieving any other constraint first is
+    # building on ground that is washing away.
+    if slope is not None and rainfall is not None and slope > 8 and rainfall > 1000:
+        return (
+            "erosion_rate",
+            f"Slope is {slope:g}% under {rainfall:g}mm/yr of rainfall. On steep ground "
+            "under high rainfall, soil loss outpaces soil formation, so carbon and "
+            "nutrients added to the profile are exported downslope before they can "
+            "accumulate. Erosion control must precede fertility building.",
+        )
     if rainfall is not None and soc is not None and rainfall < 500 and soc < 1.0:
         return (
             "plant_available_water",
@@ -725,6 +833,20 @@ def limiting_factor(site: SiteState) -> tuple[str, str]:
             f"Soil pH of {ph} falls outside the 5.5-8.5 range in which nutrient "
             "availability and microbial activity are not impaired.",
         )
+    # 5. Leaching. This fires at a pH the extreme-pH rule above deliberately
+    # passes over: 6.0 is inside the 5.5-8.5 band and is not itself a
+    # problem, but under heavy rainfall it is evidence of ongoing base-cation
+    # export, and it is the nutrient supply rather than the pH reading that
+    # binds.
+    if rainfall is not None and ph is not None and rainfall > 1500 and ph < 6.0:
+        return (
+            "nutrient_cycling_rate",
+            f"Rainfall of {rainfall:g}mm/yr with soil pH {ph:g}: high rainfall leaches "
+            "base cations and acidifies the profile, so nitrogen and phosphorus "
+            "availability limits productivity even where carbon stocks are adequate. "
+            "The pH itself is inside the 5.5-8.5 band and is not the constraint; it is "
+            "the marker of the leaching that is.",
+        )
     if edge_density is not None and (
         edge_density.band == "high" or (edge_density.value is not None and edge_density.value > 0.7)
     ):
@@ -733,7 +855,33 @@ def limiting_factor(site: SiteState) -> tuple[str, str]:
             "Edge density is high, indicating fragmented habitat: patches are too "
             "disconnected for species movement regardless of on-field soil condition.",
         )
-    return ("none", "No single variable identified from available site data as the binding constraint.")
+    if soc is not None and rainfall is not None and soc >= 1.0 and 500 <= rainfall <= 1500:
+        return (
+            "species_richness",
+            f"Soil organic carbon is {soc:g}% and rainfall {rainfall:g}mm/yr, so neither "
+            "soil carbon nor water is limiting. Where soil and water are adequate, "
+            "biodiversity is usually constrained by habitat structure and connectivity "
+            "rather than by soil fertility.",
+        )
+
+    # Fall-through. Nothing crossed a threshold, which is a weaker finding
+    # than any branch above and is reported as such.
+    if soc is not None and soc < 1.0:
+        return (
+            "soil_organic_carbon",
+            f"Soil organic carbon is {soc:g}%. That is above the 0.5% level at which soil "
+            "function is severely constrained, so no threshold is breached, but it is "
+            "still below the 1% level at which structure and nutrient supply are secure, "
+            "and no other constraint triggered. Carbon is the binding constraint by "
+            "elimination rather than by a crossed threshold." + _missing_data_note(site),
+        )
+    return (
+        "species_richness",
+        "No soil, water, pH or erosion threshold was crossed by the available "
+        "measurements. On that basis the binding constraint is taken to be habitat "
+        "structure and connectivity rather than soil fertility, which is a default "
+        "rather than a finding." + _missing_data_note(site),
+    )
 
 
 def _targets_limiting_factor(graph: nx.MultiDiGraph, negative_target: str, limiting_var: str) -> bool:
@@ -746,6 +894,22 @@ def _targets_limiting_factor(graph: nx.MultiDiGraph, negative_target: str, limit
     if negative_target == limiting_var:
         return True
     return limiting_var in nx.descendants(graph, negative_target)
+
+
+def _constraint_priority(ranked: RankedIntervention, limiting_var: str) -> float:
+    """How strongly a tier 1 intervention relieves the binding constraint.
+
+    Magnitude of the movement discounted by evidence_quality, the same axis
+    the multi-objective score discounts by, so a large mechanistic-only claim
+    does not displace a smaller well-evidenced one. Returns 0.0 for tier 2 so
+    that tier's ordering is left to the score alone.
+    """
+    if ranked.tier != 1 or ranked.constraint_movement is None:
+        return 0.0
+    result = ranked.effects.get(limiting_var)
+    if result is None:
+        return 0.0
+    return abs(ranked.constraint_movement) * _CONFIDENCE_FACTOR[result.evidence_quality]
 
 
 def _sequencing_note(intervention: str, negative_targets: set[str], limiting_var: str, why: str) -> str:
@@ -768,17 +932,19 @@ def rank_interventions(
         objectives = DEFAULT_OBJECTIVES
 
     limiting_var, limiting_why = limiting_factor(site)
+    constraint_direction = _improvement_direction(limiting_var, site)
 
-    # Liebig's law of the minimum, applied to the objective weights rather
-    # than only to the diagnosis: at a site where one variable binds, gains
-    # on that variable are worth more than gains elsewhere, because the
-    # others cannot be realised until it is relieved. A modelling
-    # assumption, and the counterpart to LIMITING_FACTOR_PENALTY_WEIGHT
-    # below: an intervention that relieves the binding constraint is
-    # rewarded on the same axis that one working against it is penalised.
-    weights = dict(objectives)
-    if limiting_var in weights:
-        weights[limiting_var] *= LIMITING_FACTOR_OBJECTIVE_BOOST
+    # The binding constraint is propagated for every intervention so the tier
+    # partition below can be decided on a real effect size, but it is scored
+    # at no weight and stays out of `weights`. Priority for relieving it is
+    # expressed by the tier and nowhere else: weighting it as well would
+    # reintroduce, in a smaller way, the same category error as boosting it
+    # -- treating a gate as a preference. It is still reported, because a
+    # reader should see what an intervention does to the constraint.
+    scored_targets = dict(objectives)
+    propagated_targets = list(scored_targets)
+    if limiting_var in STATE_VARIABLES and limiting_var not in propagated_targets:
+        propagated_targets.append(limiting_var)
 
     ranked: list[RankedIntervention] = []
     for intervention in INTERVENTIONS:
@@ -786,10 +952,16 @@ def rank_interventions(
         score = 0.0
         vars_touched: set[str] = set()
 
-        for target, weight in weights.items():
+        for target in propagated_targets:
             result = propagate(graph, intervention, target, site, n=n, rng=np.random.default_rng(seed))
             effects[target] = result
-            if result.paths_found > 0:
+            if result.paths_found == 0:
+                continue
+            for pc in result.paths:
+                vars_touched.update(pc.path)
+
+            weight = scored_targets.get(target, 0.0)
+            if weight:
                 # Score on evidence_quality, not magnitude_confidence: p50
                 # already comes from a distribution whose width reflects
                 # magnitude uncertainty (including contested disagreement),
@@ -798,10 +970,20 @@ def rank_interventions(
                 # -- how well-supported the relationship is -- is the axis
                 # a ranking score should discount by.
                 cf = _CONFIDENCE_FACTOR[result.evidence_quality]
-                score += weight * result.p50 * cf * result.convergence_factor
-                for pc in result.paths:
-                    vars_touched.update(pc.path)
+                # Improvement is a rise for every standing objective and a
+                # fall for a variable like erosion, so the propagated change
+                # enters the score with the target's improvement direction
+                # applied. A no-op for the default objectives, which are all
+                # higher-is-better, and correct if a caller passes others.
+                direction = CONSTRAINT_DIRECTION.get(target, 1.0)
+                score += weight * result.p50 * direction * cf * result.convergence_factor
 
+        # Deliberately objectives, not weights: an injected constraint from
+        # CONSTRAINT_DIRECTION can be lower-is-better, and the pairing below
+        # reads a negative p50 as harm. Feeding erosion_rate in would flag
+        # contour bunding as conflicting with the erosion constraint it
+        # relieves. Tradeoff detection stays on the higher-is-better set
+        # until it understands direction.
         tradeoffs = find_tradeoffs(graph, intervention, site, targets=list(objectives.keys()), n=n, seed=seed)
         conflicting_targets: set[str] = set()
         for tradeoff in tradeoffs:
@@ -826,6 +1008,19 @@ def rank_interventions(
 
         n_variables_touched = len({v for v in vars_touched if v in STATE_VARIABLES})
 
+        # Tier 1 requires all three of: a path to the constraint, movement in
+        # the direction the site needs, and enough of it to matter. A path
+        # alone is not enough -- an intervention that raises erosion has a
+        # path to erosion_rate too.
+        constraint_result = effects.get(limiting_var)
+        addresses = False
+        constraint_movement: float | None = None
+        if constraint_result is not None and constraint_result.paths_found > 0:
+            constraint_movement = constraint_result.p50
+            if constraint_direction:
+                improvement = constraint_result.p50 * constraint_direction
+                addresses = improvement > TIER_1_MIN_EFFECT
+
         ranked.append(
             RankedIntervention(
                 intervention=intervention,
@@ -834,6 +1029,9 @@ def rank_interventions(
                 tradeoffs=tradeoffs,
                 n_variables_touched=n_variables_touched,
                 limiting_factor_addressed=limiting_var in vars_touched,
+                addresses_limiting_factor=addresses,
+                tier=1 if addresses else 2,
+                constraint_movement=constraint_movement,
                 conflicts_with_limiting_factor=bool(conflicting_targets),
                 sequencing_note=(
                     _sequencing_note(intervention, conflicting_targets, limiting_var, limiting_why)
@@ -843,5 +1041,30 @@ def rank_interventions(
             )
         )
 
-    ranked.sort(key=lambda r: r.score, reverse=True)
+    # Liebig's law of the minimum as a gate: every intervention that relieves
+    # the binding constraint ranks above every intervention that does not,
+    # whatever their scores, because a gain sitting behind a shut gate cannot
+    # be realised.
+    #
+    # Within tier 1 the question is no longer "what is best overall" but
+    # "what most relieves the constraint", since by Liebig's law nothing else
+    # can be realised until it lifts. So tier 1 is ordered by how far it
+    # moves the constraint, discounted by evidence_quality on the same axis
+    # used everywhere else, and the multi-objective score only breaks ties:
+    # co-benefits decide between two interventions that relieve the
+    # constraint comparably, and never outweigh relieving it. Ordering tier 1
+    # by the multi-objective score instead put an intervention scoring 0.0 --
+    # because the constraint carries no score weight -- above better ones,
+    # which defeated the gate from inside.
+    #
+    # Tier 2 ordering is by score alone. Its members do not move the
+    # constraint by definition, so _constraint_priority returns 0.0 for all
+    # of them and the key collapses to the score.
+    #
+    # When no intervention in the graph can address the constraint, tier 1 is
+    # empty and this degrades to the plain score ranking. That case is left
+    # visible rather than patched: every returned item carries tier 2, which
+    # is what callers check to report the fallback instead of presenting a
+    # list that silently ignores the diagnosis.
+    ranked.sort(key=lambda r: (r.tier, -_constraint_priority(r, limiting_var), -r.score))
     return ranked

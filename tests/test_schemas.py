@@ -88,7 +88,7 @@ def _valid_edge_kwargs(**overrides):
         effect=Distribution(family="lognormal", ci_low=0.049, ci_high=0.096),
         metric=EffectMetric.LRR,
         lag_years=(1.0, 3.0),
-        evidence=[EvidenceRef(source_id="Joshi_2023_covercrops_SOC")],
+        evidence=[EvidenceRef(source_id="Joshi_2023_covercrops_SOC", role="primary")],
         strength=EvidenceStrength.META_ANALYSIS,
         confidence=Confidence.MODERATE,
         mechanism="Cover crop residue inputs increase soil carbon.",
@@ -108,6 +108,8 @@ def test_causal_edge_contested_without_note_raises():
 
 
 def test_validate_source_ids_fabricated_raises():
-    edge = CausalEdge(**_valid_edge_kwargs(evidence=[EvidenceRef(source_id="Fabricated_2024")]))
+    edge = CausalEdge(
+        **_valid_edge_kwargs(evidence=[EvidenceRef(source_id="Fabricated_2024", role="primary")])
+    )
     with pytest.raises(ValueError):
         validate_source_ids([edge], "sources.yaml")

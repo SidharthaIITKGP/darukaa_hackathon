@@ -44,14 +44,26 @@ class Distribution(BaseModel):
             raise ValueError("ci_low must be > 0 unless family is 'normal'")
         return self
 
+    def spans_zero(self) -> bool:
+        """True when the interval contains zero, meaning the direction of the
+        effect is unresolved rather than merely imprecise. Only possible for
+        the normal family: the others require ci_low > 0, and a negative-sign
+        edge carries its direction in `sign` with a positive magnitude here.
+        """
+        return self.ci_low < 0 < self.ci_high
+
     def params(self) -> dict[str, float]:
         """Derive distribution parameters from the published interval."""
         z = _Z_BY_CI_LEVEL[self.ci_level]
         if self.family == "lognormal":
             if self.ci_low <= 0:
                 raise ValueError("lognormal requires ci_low > 0")
-            mu = math.log(math.sqrt(self.ci_low * self.ci_high))
-            sigma = (math.log(self.ci_high) - math.log(self.ci_low)) / (2 * z)
+            if self.point is not None:
+                mu = math.log(self.point)
+                sigma = max(math.log(self.ci_high) - mu, mu - math.log(self.ci_low)) / z
+            else:
+                mu = math.log(math.sqrt(self.ci_low * self.ci_high))
+                sigma = (math.log(self.ci_high) - math.log(self.ci_low)) / (2 * z)
             return {"mu": mu, "sigma": sigma}
         if self.family == "normal":
             mean = (self.ci_low + self.ci_high) / 2
@@ -238,7 +250,23 @@ class EvidenceStrength(str, Enum):
 
 
 class EvidenceRef(BaseModel):
+    """A citation attached to an edge, plus what that citation actually does
+    for the edge.
+
+    role is required and must be chosen deliberately, because counting
+    references is not the same as counting agreement:
+      primary       this source establishes the relationship.
+      corroborating an independent source agreeing on DIRECTION. It may
+                    disagree on magnitude; that belongs in the interval.
+      contradicting a source finding no effect, or the opposite direction.
+      critique      a methodological comment on another study, not an
+                    independent measurement of the relationship.
+    Only primary and corroborating refs count as agreement. A critique of a
+    contradicting study is not corroboration of the effect.
+    """
+
     source_id: str
+    role: Literal["primary", "corroborating", "contradicting", "critique"]
     pages: list[int] | None = None
     chunk_ids: list[str] | None = None
     quote: str | None = None

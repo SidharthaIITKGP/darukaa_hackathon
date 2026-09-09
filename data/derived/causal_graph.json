@@ -294,7 +294,7 @@
         "effect": {
           "family": "lognormal",
           "ci_low": 0.05,
-          "ci_high": 0.25,
+          "ci_high": 0.2,
           "ci_level": 0.95,
           "point": null
         },
@@ -315,6 +315,7 @@
         "evidence": [
           {
             "source_id": "FAO_2020_soil_biodiversity",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -339,7 +340,7 @@
         "effect": {
           "family": "lognormal",
           "ci_low": 0.05,
-          "ci_high": 0.35,
+          "ci_high": 0.2,
           "ci_level": 0.95,
           "point": null
         },
@@ -360,6 +361,7 @@
         "evidence": [
           {
             "source_id": "FAO_2020_soil_biodiversity",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -383,8 +385,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.3,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -405,6 +407,7 @@
         "evidence": [
           {
             "source_id": "FAO_2020_soil_biodiversity",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -428,8 +431,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.35,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -450,6 +453,7 @@
         "evidence": [
           {
             "source_id": "FAO_2020_soil_biodiversity",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -474,7 +478,7 @@
         "effect": {
           "family": "lognormal",
           "ci_low": 0.05,
-          "ci_high": 0.3,
+          "ci_high": 0.2,
           "ci_level": 0.95,
           "point": null
         },
@@ -495,6 +499,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -518,7 +523,7 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.03,
+          "ci_low": 0.05,
           "ci_high": 0.2,
           "ci_level": 0.95,
           "point": null
@@ -540,6 +545,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -563,8 +569,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.02,
-          "ci_high": 0.15,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -585,6 +591,7 @@
         "evidence": [
           {
             "source_id": "IPCC_2019_SRCCL_Ch6",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -608,8 +615,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.25,
+          "ci_low": 0.03,
+          "ci_high": 0.12,
           "ci_level": 0.95,
           "point": null
         },
@@ -630,6 +637,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -653,8 +661,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.3,
+          "ci_low": 0.03,
+          "ci_high": 0.12,
           "ci_level": 0.95,
           "point": null
         },
@@ -675,6 +683,7 @@
         "evidence": [
           {
             "source_id": "FAO_2020_soil_biodiversity",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -698,8 +707,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.25,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -720,6 +729,7 @@
         "evidence": [
           {
             "source_id": "FAO_2020_soil_biodiversity",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -743,8 +753,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.25,
+          "ci_low": 0.03,
+          "ci_high": 0.12,
           "ci_level": 0.95,
           "point": null
         },
@@ -765,6 +775,7 @@
         "evidence": [
           {
             "source_id": "FAO_2020_soil_biodiversity",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -788,8 +799,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.02,
-          "ci_high": 0.15,
+          "ci_low": 0.05,
+          "ci_high": 0.2,
           "ci_level": 0.95,
           "point": null
         },
@@ -810,6 +821,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -833,8 +845,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.25,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -855,6 +867,7 @@
         "evidence": [
           {
             "source_id": "IPBES_2018_LDR",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -878,8 +891,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.3,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -900,6 +913,7 @@
         "evidence": [
           {
             "source_id": "IPBES_2018_LDR",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -923,8 +937,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.3,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -945,6 +959,7 @@
         "evidence": [
           {
             "source_id": "IPBES_2018_LDR",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -968,8 +983,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.3,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -990,6 +1005,7 @@
         "evidence": [
           {
             "source_id": "IPBES_2018_LDR",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1037,6 +1053,7 @@
         "evidence": [
           {
             "source_id": "Woodcock_2019_pollinator_yield",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1061,7 +1078,7 @@
         "effect": {
           "family": "lognormal",
           "ci_low": 0.01,
-          "ci_high": 0.1,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1082,6 +1099,7 @@
         "evidence": [
           {
             "source_id": "IPBES_2018_LDR",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1105,8 +1123,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.03,
-          "ci_high": 0.2,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1127,6 +1145,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1174,13 +1193,15 @@
         "evidence": [
           {
             "source_id": "Joshi_2023_covercrops_SOC",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
-            "note": null
+            "note": "Pooled 0-15cm estimate. Joshi also reports tillage subgroups: +8.6-33.7% at 0-15cm under conventional tillage versus +0.3-10.5% under no-tillage. The graph models the pooled effect because tillage state is not represented as a node, so the no-till subgroup's condition (no-tillage) can never be gated and was removed as a separate edge rather than left firing unconditionally."
           },
           {
             "source_id": "McClelland_2020_covercrops_SOC",
+            "role": "corroborating",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1189,60 +1210,13 @@
         ],
         "strength": "meta_analysis",
         "confidence": "moderate",
-        "mechanism": "Legume cover crops fix atmospheric nitrogen and exude labile carbon compounds from their roots, feeding soil microbial biomass that stabilises new organic matter. Their above and below-ground residues add fresh carbon input beyond what the cash crop alone contributes.",
+        "mechanism": "Legume cover crops fix atmospheric nitrogen and exude labile carbon compounds from their roots, feeding soil microbial biomass that stabilises new organic matter. Their above and below-ground residues add fresh carbon input beyond what the cash crop alone contributes. Joshi 2023 reports +8.6-33.7% at 0-15cm under conventional tillage versus +0.3-10.5% under no-tillage; the graph models the pooled effect since tillage state is not a node here.",
         "contested": true,
         "contested_note": "Joshi 2023 reports +7.3% (95% CI 4.9-9.6%, n=61 studies); McClelland 2021 reports +12% (+1.11 Mg C/ha, 40 publications, 181 observations) in temperate systems. Interval widened to 4.9-13% to span both rather than averaging."
       },
       "source": "legume_cover_crop",
       "target": "soil_organic_carbon",
       "key": 0
-    },
-    {
-      "edge": {
-        "source": "legume_cover_crop",
-        "target": "soil_organic_carbon",
-        "sign": "+",
-        "effect": {
-          "family": "lognormal",
-          "ci_low": 0.003,
-          "ci_high": 0.105,
-          "ci_level": 0.95,
-          "point": null
-        },
-        "metric": "percent_change",
-        "lag_years": [
-          2.0,
-          4.0
-        ],
-        "conditions": {
-          "rainfall_mm": null,
-          "soc_pct": null,
-          "ph": null,
-          "clay_pct": null,
-          "slope_pct": null,
-          "land_use": [
-            "cropland"
-          ],
-          "climate_zone": null
-        },
-        "evidence": [
-          {
-            "source_id": "Joshi_2023_covercrops_SOC",
-            "pages": null,
-            "chunk_ids": null,
-            "quote": null,
-            "note": "0-15cm no-till subgroup"
-          }
-        ],
-        "strength": "meta_analysis",
-        "confidence": "low",
-        "mechanism": "Under no-tillage, residues and root exudates from the legume cover crop concentrate in the undisturbed 0-15cm layer rather than being redistributed by inversion tillage, so the measured carbon gain is a shallow-depth subgroup estimate specific to no-till management. The graph has no explicit tillage-state node, so this precondition is encoded here rather than as a separate edge.",
-        "contested": false,
-        "contested_note": null
-      },
-      "source": "legume_cover_crop",
-      "target": "soil_organic_carbon",
-      "key": 1
     },
     {
       "edge": {
@@ -1275,6 +1249,7 @@
         "evidence": [
           {
             "source_id": "Joshi_2023_covercrops_SOC",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1282,6 +1257,7 @@
           },
           {
             "source_id": "McClelland_2020_covercrops_SOC",
+            "role": "corroborating",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1305,8 +1281,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.03,
-          "ci_high": 0.2,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1327,6 +1303,7 @@
         "evidence": [
           {
             "source_id": "IPBES_2018_LDR",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1350,8 +1327,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.02,
-          "ci_high": 0.1,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1374,6 +1351,7 @@
         "evidence": [
           {
             "source_id": "IPCC_2022_AR6_WG3_Ch7",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1419,6 +1397,7 @@
         "evidence": [
           {
             "source_id": "GCB_2025_agroforestry_multifunctionality",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1426,6 +1405,7 @@
           },
           {
             "source_id": "Mupepele_2021_agroforestry_biodiv",
+            "role": "contradicting",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1433,6 +1413,7 @@
           },
           {
             "source_id": "Boinot_2022_agroforestry_critique",
+            "role": "critique",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1456,8 +1437,8 @@
         "sign": "-",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.02,
-          "ci_high": 0.25,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1481,6 +1462,7 @@
         "evidence": [
           {
             "source_id": "IPCC_2019_SRCCL_Ch6",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1499,13 +1481,13 @@
     },
     {
       "edge": {
-        "source": "boundary_tree_planting",
+        "source": "alley_cropping",
         "target": "plant_available_water",
         "sign": "-",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.03,
-          "ci_high": 0.2,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1529,6 +1511,56 @@
         "evidence": [
           {
             "source_id": "IPCC_2019_SRCCL_Ch6",
+            "role": "primary",
+            "pages": null,
+            "chunk_ids": null,
+            "quote": null,
+            "note": null
+          }
+        ],
+        "strength": "mechanistic",
+        "confidence": "low",
+        "mechanism": "The tree-crop competition that the alley_cropping -> crop_yield edge records is competition for water in the first place, so it acts on the water pool directly and not only on yield. Alley tree rows transpire from the same shallow root-zone store the crop draws on, which in semi-arid settings with limited recharge is a net withdrawal. Encoded as its own edge because a tradeoff that lands on plant_available_water is what tells a water-limited site that this intervention works against its binding constraint; recording only the yield consequence hides that.",
+        "contested": false,
+        "contested_note": null
+      },
+      "source": "alley_cropping",
+      "target": "plant_available_water",
+      "key": 0
+    },
+    {
+      "edge": {
+        "source": "boundary_tree_planting",
+        "target": "plant_available_water",
+        "sign": "-",
+        "effect": {
+          "family": "lognormal",
+          "ci_low": 0.01,
+          "ci_high": 0.08,
+          "ci_level": 0.95,
+          "point": null
+        },
+        "metric": "percent_change",
+        "lag_years": [
+          2.0,
+          5.0
+        ],
+        "conditions": {
+          "rainfall_mm": null,
+          "soc_pct": null,
+          "ph": null,
+          "clay_pct": null,
+          "slope_pct": null,
+          "land_use": null,
+          "climate_zone": [
+            "semi_arid",
+            "arid"
+          ]
+        },
+        "evidence": [
+          {
+            "source_id": "IPCC_2019_SRCCL_Ch6",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1552,8 +1584,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.1,
-          "ci_high": 0.4,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1574,6 +1606,7 @@
         "evidence": [
           {
             "source_id": "IPBES_2018_LDR",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1597,8 +1630,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.1,
-          "ci_high": 0.4,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1619,6 +1652,7 @@
         "evidence": [
           {
             "source_id": "IPBES_2018_LDR",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1643,7 +1677,7 @@
         "effect": {
           "family": "lognormal",
           "ci_low": 0.03,
-          "ci_high": 0.2,
+          "ci_high": 0.12,
           "ci_level": 0.95,
           "point": null
         },
@@ -1664,6 +1698,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1688,7 +1723,7 @@
         "effect": {
           "family": "lognormal",
           "ci_low": 0.03,
-          "ci_high": 0.25,
+          "ci_high": 0.12,
           "ci_level": 0.95,
           "point": null
         },
@@ -1709,6 +1744,7 @@
         "evidence": [
           {
             "source_id": "FAO_2020_soil_biodiversity",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1732,8 +1768,8 @@
         "sign": "-",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.02,
-          "ci_high": 0.15,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1754,6 +1790,7 @@
         "evidence": [
           {
             "source_id": "IPCC_2022_AR6_WG3_Ch7",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1799,6 +1836,7 @@
         "evidence": [
           {
             "source_id": "FAO_2022_GSOCseq",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1822,8 +1860,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.3,
+          "ci_low": 0.03,
+          "ci_high": 0.12,
           "ci_level": 0.95,
           "point": null
         },
@@ -1847,6 +1885,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1892,6 +1931,7 @@
         "evidence": [
           {
             "source_id": "FAO_2022_GSOCseq",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1916,7 +1956,7 @@
         "effect": {
           "family": "normal",
           "ci_low": 0.01,
-          "ci_high": 0.1,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1937,6 +1977,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -1960,8 +2001,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.02,
-          "ci_high": 0.15,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -1982,6 +2023,7 @@
         "evidence": [
           {
             "source_id": "IPCC_2022_AR6_WG3_Ch7",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2005,8 +2047,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.1,
-          "ci_high": 0.5,
+          "ci_low": 0.05,
+          "ci_high": 0.2,
           "ci_level": 0.95,
           "point": null
         },
@@ -2030,6 +2072,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2053,8 +2096,8 @@
         "sign": "-",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.2,
-          "ci_high": 0.6,
+          "ci_low": 0.05,
+          "ci_high": 0.2,
           "ci_level": 0.95,
           "point": null
         },
@@ -2078,6 +2121,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2101,8 +2145,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.1,
-          "ci_high": 0.4,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -2126,6 +2170,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2149,8 +2194,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.4,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -2171,6 +2216,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2194,8 +2240,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.3,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -2216,6 +2262,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2239,8 +2286,8 @@
         "sign": "-",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.15,
-          "ci_high": 0.45,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -2264,6 +2311,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2287,8 +2335,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.05,
-          "ci_high": 0.3,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -2311,6 +2359,7 @@
         "evidence": [
           {
             "source_id": "IPCC_2019_SRCCL_Ch6",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2334,8 +2383,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.1,
-          "ci_high": 0.4,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -2358,6 +2407,7 @@
         "evidence": [
           {
             "source_id": "IPCC_2019_SRCCL_Ch6",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2381,8 +2431,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.03,
-          "ci_high": 0.2,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -2403,6 +2453,7 @@
         "evidence": [
           {
             "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,
@@ -2426,8 +2477,8 @@
         "sign": "+",
         "effect": {
           "family": "lognormal",
-          "ci_low": 0.1,
-          "ci_high": 0.35,
+          "ci_low": 0.01,
+          "ci_high": 0.08,
           "ci_level": 0.95,
           "point": null
         },
@@ -2450,6 +2501,7 @@
         "evidence": [
           {
             "source_id": "IPCC_2019_SRCCL_Ch6",
+            "role": "primary",
             "pages": null,
             "chunk_ids": null,
             "quote": null,

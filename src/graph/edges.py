@@ -48,39 +48,28 @@ EDGES.append(
             "systems. Interval widened to 4.9-13% to span both rather than averaging."
         ),
         evidence=[
-            EvidenceRef(source_id="Joshi_2023_covercrops_SOC"),
-            EvidenceRef(source_id="McClelland_2020_covercrops_SOC"),
+            EvidenceRef(
+                source_id="Joshi_2023_covercrops_SOC",
+                role="primary",
+                note=(
+                    "Pooled 0-15cm estimate. Joshi also reports tillage subgroups: "
+                    "+8.6-33.7% at 0-15cm under conventional tillage versus +0.3-10.5% "
+                    "under no-tillage. The graph models the pooled effect because tillage "
+                    "state is not represented as a node, so the no-till subgroup's "
+                    "condition (no-tillage) can never be gated and was removed as a "
+                    "separate edge rather than left firing unconditionally."
+                ),
+            ),
+            EvidenceRef(source_id="McClelland_2020_covercrops_SOC", role="corroborating"),
         ],
         conditions=Conditions(land_use=["cropland"]),
         mechanism=(
             "Legume cover crops fix atmospheric nitrogen and exude labile carbon compounds "
             "from their roots, feeding soil microbial biomass that stabilises new organic "
             "matter. Their above and below-ground residues add fresh carbon input beyond "
-            "what the cash crop alone contributes."
-        ),
-    )
-)
-
-EDGES.append(
-    CausalEdge(
-        source="legume_cover_crop",
-        target="soil_organic_carbon",
-        sign="+",
-        metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.003, ci_high=0.105, ci_level=0.95),
-        lag_years=(2, 4),
-        strength=EvidenceStrength.META_ANALYSIS,
-        confidence=Confidence.LOW,
-        conditions=Conditions(land_use=["cropland"]),
-        evidence=[
-            EvidenceRef(source_id="Joshi_2023_covercrops_SOC", note="0-15cm no-till subgroup"),
-        ],
-        mechanism=(
-            "Under no-tillage, residues and root exudates from the legume cover crop "
-            "concentrate in the undisturbed 0-15cm layer rather than being redistributed by "
-            "inversion tillage, so the measured carbon gain is a shallow-depth subgroup "
-            "estimate specific to no-till management. The graph has no explicit tillage-state "
-            "node, so this precondition is encoded here rather than as a separate edge."
+            "what the cash crop alone contributes. Joshi 2023 reports +8.6-33.7% at 0-15cm "
+            "under conventional tillage versus +0.3-10.5% under no-tillage; the graph "
+            "models the pooled effect since tillage state is not a node here."
         ),
     )
 )
@@ -97,8 +86,8 @@ EDGES.append(
         confidence=Confidence.LOW,
         conditions=Conditions(land_use=["cropland"]),
         evidence=[
-            EvidenceRef(source_id="Joshi_2023_covercrops_SOC"),
-            EvidenceRef(source_id="McClelland_2020_covercrops_SOC"),
+            EvidenceRef(source_id="Joshi_2023_covercrops_SOC", role="primary"),
+            EvidenceRef(source_id="McClelland_2020_covercrops_SOC", role="corroborating"),
         ],
         mechanism=(
             "Non-legume cover crops (grasses, brassicas) add above and below-ground biomass "
@@ -119,7 +108,7 @@ EDGES.append(
         lag_years=(1, 20),
         strength=EvidenceStrength.MULTI_SITE,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2022_GSOCseq")],
+        evidence=[EvidenceRef(source_id="FAO_2022_GSOCseq", role="primary")],
         mechanism=(
             "GSOCseq models three carbon-input scenarios above business-as-usual: SSM1 (+5% "
             "input, low residue retention intensity), SSM2 (+10%, medium), and SSM3 (+20%, "
@@ -140,7 +129,7 @@ EDGES.append(
         lag_years=(1, 20),
         strength=EvidenceStrength.MULTI_SITE,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2022_GSOCseq")],
+        evidence=[EvidenceRef(source_id="FAO_2022_GSOCseq", role="primary")],
         mechanism=(
             "Manure application increases carbon input above business-as-usual in the same "
             "way residue retention does; GSOCseq does not distinguish input source, so the "
@@ -168,9 +157,9 @@ EDGES.append(
             "controls. Encoded as a wide interval spanning no effect."
         ),
         evidence=[
-            EvidenceRef(source_id="GCB_2025_agroforestry_multifunctionality"),
-            EvidenceRef(source_id="Mupepele_2021_agroforestry_biodiv"),
-            EvidenceRef(source_id="Boinot_2022_agroforestry_critique"),
+            EvidenceRef(source_id="GCB_2025_agroforestry_multifunctionality", role="primary"),
+            EvidenceRef(source_id="Mupepele_2021_agroforestry_biodiv", role="contradicting"),
+            EvidenceRef(source_id="Boinot_2022_agroforestry_critique", role="critique"),
         ],
         mechanism=(
             "Tree rows add structural and floral resource diversity that can support more "
@@ -190,7 +179,7 @@ EDGES.append(
         lag_years=(0, 1),
         strength=EvidenceStrength.META_ANALYSIS,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="Woodcock_2019_pollinator_yield")],
+        evidence=[EvidenceRef(source_id="Woodcock_2019_pollinator_yield", role="primary")],
         conditions=Conditions(land_use=["cropland"]),
         mechanism=(
             "Both functional diversity and abundance of pollinators independently enhance "
@@ -208,11 +197,11 @@ EDGES.append(
         target="aggregate_stability",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.25),
+        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.2),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity")],
+        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Organic matter binds mineral particles into aggregates via microbial glues and "
             "root/fungal filaments, so higher soil carbon increases resistance of aggregates "
@@ -227,11 +216,11 @@ EDGES.append(
         target="infiltration_rate",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.30),
+        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.2),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "Stable aggregates preserve macropores at the soil surface instead of sealing "
             "under raindrop impact, so water continues to enter the profile rather than "
@@ -246,11 +235,11 @@ EDGES.append(
         target="plant_available_water",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.20),
+        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.2),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "Faster infiltration diverts a larger share of rainfall into the root-zone "
             "profile instead of surface runoff, increasing the water stored for plant uptake."
@@ -264,11 +253,11 @@ EDGES.append(
         target="canopy_cover",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.02, ci_high=0.15),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6")],
+        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6", role="primary")],
         mechanism=(
             "Greater plant-available water relieves drought stress and supports fuller leaf "
             "expansion and canopy closure across the growing season."
@@ -282,11 +271,11 @@ EDGES.append(
         target="structural_heterogeneity",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.25),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 5),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPBES_2018_LDR")],
+        evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
         mechanism=(
             "Denser, taller canopy adds vertical strata and patchiness to the vegetation "
             "structure that a bare or uniformly short crop stand lacks."
@@ -300,11 +289,11 @@ EDGES.append(
         target="pollinator_abundance",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.30),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPBES_2018_LDR")],
+        evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
         mechanism=(
             "Structurally varied vegetation offers more nesting sites and a longer sequence "
             "of flowering resources across the season, supporting a larger resident "
@@ -319,11 +308,11 @@ EDGES.append(
         target="microbial_biomass_carbon",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.35),
+        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.2),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity")],
+        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Soil organic carbon is the substrate microbes metabolise, so a larger carbon "
             "pool supports a larger standing microbial biomass."
@@ -337,11 +326,11 @@ EDGES.append(
         target="nutrient_cycling_rate",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.30),
+        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.12),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity")],
+        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Microbial biomass is the engine that mineralises organic matter into "
             "plant-available forms; a larger microbial pool turns over nutrients faster."
@@ -355,11 +344,11 @@ EDGES.append(
         target="nitrogen_availability",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.25),
+        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.12),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity")],
+        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Faster mineralisation of organic nitrogen pools directly increases the "
             "plant-available nitrogen fraction in the root zone."
@@ -373,11 +362,11 @@ EDGES.append(
         target="crop_yield",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.02, ci_high=0.15),
+        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.2),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "Nitrogen is the most commonly yield-limiting nutrient in most cropping systems, "
             "so higher availability relieves a limiting constraint on growth."
@@ -391,11 +380,11 @@ EDGES.append(
         target="infiltration_rate",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.10, ci_high=0.50),
+        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.2),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         conditions=Conditions(slope_pct=(2, 60)),
         mechanism=(
             "Contour bunds intercept overland flow and pond it behind the bund, extending "
@@ -411,13 +400,14 @@ EDGES.append(
         target="erosion_rate",
         sign="-",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.20, ci_high=0.60),
+        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.2),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
         evidence=[
             EvidenceRef(
                 source_id="FAO_2017_VGSSM",
+                role="primary",
                 note=(
                     "Supports direction only (bunding reduces erosion). The 20-60% "
                     "reduction interval is an own estimate, not a published figure."
@@ -439,11 +429,11 @@ EDGES.append(
         target="structural_heterogeneity",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.10, ci_high=0.40),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(2, 5),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPBES_2018_LDR")],
+        evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
         mechanism=(
             "Woody hedgerows add a permanent vertical structural element and edge habitat "
             "that a monoculture field margin lacks."
@@ -457,11 +447,11 @@ EDGES.append(
         target="habitat_connectivity",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.10, ci_high=0.40),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(2, 5),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPBES_2018_LDR")],
+        evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
         mechanism=(
             "Hedgerows act as linear corridors linking otherwise isolated patches of "
             "semi-natural habitat, allowing species to move between them."
@@ -475,11 +465,11 @@ EDGES.append(
         target="species_richness",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.30),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(2, 7),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPBES_2018_LDR")],
+        evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
         mechanism=(
             "Better-connected habitat patches support larger, more resilient populations and "
             "allow recolonisation after local extinction, increasing the number of species "
@@ -494,11 +484,11 @@ EDGES.append(
         target="aggregate_stability",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.20),
+        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.12),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "Reduced mechanical disturbance leaves fungal hyphal networks and existing "
             "aggregates intact rather than physically shattering them each pass."
@@ -512,11 +502,11 @@ EDGES.append(
         target="microbial_biomass_carbon",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.25),
+        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.12),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity")],
+        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Less disturbance reduces oxidation of soil organic matter and physical "
             "disruption of microbial habitat, letting microbial biomass build up over time."
@@ -530,11 +520,11 @@ EDGES.append(
         target="soil_moisture_retention",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.30),
+        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.12),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         conditions=Conditions(rainfall_mm=(200, 1200)),
         mechanism=(
             "A surface mulch layer shades and shelters the soil surface from direct solar "
@@ -551,11 +541,11 @@ EDGES.append(
         target="plant_available_water",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.25),
+        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.12),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.MODERATE,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "Water retained in the profile rather than lost to evaporation directly adds to "
             "the pool available for root uptake."
@@ -569,11 +559,11 @@ EDGES.append(
         target="canopy_cover",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.30),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6")],
+        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6", role="primary")],
         conditions=Conditions(land_use=["grazing_land"]),
         mechanism=(
             "Planned rest periods between grazing bouts let vegetation regrow canopy and "
@@ -589,11 +579,11 @@ EDGES.append(
         target="groundwater_recharge",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.40),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "A farm pond captures runoff that would otherwise leave the catchment and holds "
             "it in contact with the soil, where it can percolate downward and recharge the "
@@ -608,11 +598,11 @@ EDGES.append(
         target="plant_available_water",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.20),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "A shallower or more replenished water table raises capillary rise into the "
             "root zone, supplementing water available to plants between rain events."
@@ -628,11 +618,11 @@ EDGES.append(
         target="crop_yield",
         sign="-",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.02, ci_high=0.25),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 5),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6")],
+        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6", role="primary")],
         conditions=Conditions(rainfall_mm=(0, 600)),
         mechanism=(
             "Tree rows compete with the adjacent crop for water and light, an effect the "
@@ -646,15 +636,40 @@ EDGES.append(
 
 EDGES.append(
     CausalEdge(
+        source="alley_cropping",
+        target="plant_available_water",
+        sign="-",
+        metric=EffectMetric.PERCENT_CHANGE,
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
+        lag_years=(2, 5),
+        strength=EvidenceStrength.MECHANISTIC,
+        confidence=Confidence.LOW,
+        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6", role="primary")],
+        conditions=Conditions(climate_zone=["semi_arid", "arid"]),
+        mechanism=(
+            "The tree-crop competition that the alley_cropping -> crop_yield edge records "
+            "is competition for water in the first place, so it acts on the water pool "
+            "directly and not only on yield. Alley tree rows transpire from the same "
+            "shallow root-zone store the crop draws on, which in semi-arid settings with "
+            "limited recharge is a net withdrawal. Encoded as its own edge because a "
+            "tradeoff that lands on plant_available_water is what tells a water-limited "
+            "site that this intervention works against its binding constraint; recording "
+            "only the yield consequence hides that."
+        ),
+    )
+)
+
+EDGES.append(
+    CausalEdge(
         source="boundary_tree_planting",
         target="plant_available_water",
         sign="-",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.20),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(2, 5),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6")],
+        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6", role="primary")],
         conditions=Conditions(climate_zone=["semi_arid", "arid"]),
         mechanism=(
             "Boundary trees draw on the same shallow soil water pool as adjacent crops "
@@ -671,11 +686,11 @@ EDGES.append(
         target="nitrogen_availability",
         sign="-",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.02, ci_high=0.15),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPCC_2022_AR6_WG3_Ch7")],
+        evidence=[EvidenceRef(source_id="IPCC_2022_AR6_WG3_Ch7", role="primary")],
         mechanism=(
             "Without incorporation, surface residues decompose and mineralise more slowly "
             "and residue carbon can immobilise available nitrogen in the short term, though "
@@ -690,11 +705,11 @@ EDGES.append(
         target="soil_ph",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="normal", ci_low=0.01, ci_high=0.10),
+        effect=Distribution(family="normal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "Organic amendments increase soil buffering capacity and release basic cations "
             "as they decompose, moderating pH toward neutral over successive applications. "
@@ -710,11 +725,11 @@ EDGES.append(
         target="mycorrhizal_colonisation",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.30),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity")],
+        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Higher soil organic carbon supports a richer soil food web and more stable "
             "root-zone habitat, favouring establishment of mycorrhizal symbioses."
@@ -728,11 +743,11 @@ EDGES.append(
         target="soil_fauna_abundance",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.35),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity")],
+        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Organic carbon is the food resource base for earthworms and other soil "
             "macrofauna, so a larger carbon pool supports a larger fauna population."
@@ -746,11 +761,11 @@ EDGES.append(
         target="nutrient_cycling_rate",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.25),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity")],
+        evidence=[EvidenceRef(source_id="FAO_2020_soil_biodiversity", role="primary")],
         mechanism=(
             "Earthworms and other macrofauna physically fragment and incorporate organic "
             "residues into the soil, accelerating the rate at which microbes can mineralise "
@@ -765,11 +780,11 @@ EDGES.append(
         target="natural_enemy_abundance",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.30),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPBES_2018_LDR")],
+        evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
         mechanism=(
             "Structurally diverse vegetation provides overwintering refugia and alternative "
             "prey for predatory and parasitoid arthropods, supporting a larger resident "
@@ -784,11 +799,11 @@ EDGES.append(
         target="crop_yield",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.10),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPBES_2018_LDR")],
+        evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
         mechanism=(
             "Predators and parasitoids suppress crop pest populations, reducing pest-driven "
             "yield loss relative to a field with fewer natural enemies present."
@@ -804,11 +819,11 @@ EDGES.append(
         target="groundwater_recharge",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.05, ci_high=0.30),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "A check dam slows ephemeral stream flow and ponds water behind the structure, "
             "increasing the time and wetted area over which water can percolate down to the "
@@ -823,11 +838,11 @@ EDGES.append(
         target="infiltration_rate",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.10, ci_high=0.40),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         conditions=Conditions(slope_pct=(2, 60)),
         mechanism=(
             "Trenches dug along the contour intercept overland flow and hold it in place "
@@ -843,11 +858,11 @@ EDGES.append(
         target="erosion_rate",
         sign="-",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.15, ci_high=0.45),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 2),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         conditions=Conditions(slope_pct=(2, 60)),
         mechanism=(
             "Dense, fibrous vetiver root mats and stiff above-ground stems form a living "
@@ -863,11 +878,11 @@ EDGES.append(
         target="soil_organic_carbon",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.02, ci_high=0.10),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 4),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPCC_2022_AR6_WG3_Ch7")],
+        evidence=[EvidenceRef(source_id="IPCC_2022_AR6_WG3_Ch7", role="primary")],
         conditions=Conditions(land_use=["cropland"]),
         mechanism=(
             "Growing two crop species together increases total root biomass and ground "
@@ -883,11 +898,11 @@ EDGES.append(
         target="natural_enemy_abundance",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.20),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPBES_2018_LDR")],
+        evidence=[EvidenceRef(source_id="IPBES_2018_LDR", role="primary")],
         mechanism=(
             "Rotating through a wider set of crop species interrupts pest life cycles tied "
             "to a single host crop and diversifies the resource base available to "
@@ -902,11 +917,11 @@ EDGES.append(
         target="canopy_cover",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.10, ci_high=0.40),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(1, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6")],
+        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6", role="primary")],
         conditions=Conditions(land_use=["grazing_land"]),
         mechanism=(
             "Removing grazing pressure entirely allows vegetation to regrow and canopy to "
@@ -922,11 +937,11 @@ EDGES.append(
         target="nitrogen_availability",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.03, ci_high=0.20),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 1),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM")],
+        evidence=[EvidenceRef(source_id="FAO_2017_VGSSM", role="primary")],
         mechanism=(
             "Combining organic and inorganic nutrient sources synchronises nutrient release "
             "with crop demand more closely than either source alone, increasing nitrogen "
@@ -941,11 +956,11 @@ EDGES.append(
         target="canopy_cover",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.10, ci_high=0.35),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(2, 6),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6")],
+        evidence=[EvidenceRef(source_id="IPCC_2019_SRCCL_Ch6", role="primary")],
         conditions=Conditions(land_use=["grazing_land"]),
         mechanism=(
             "Integrating trees into grazing land adds a woody canopy layer above the "
@@ -961,11 +976,11 @@ EDGES.append(
         target="soil_organic_carbon",
         sign="+",
         metric=EffectMetric.PERCENT_CHANGE,
-        effect=Distribution(family="lognormal", ci_low=0.02, ci_high=0.15),
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
         lag_years=(0, 3),
         strength=EvidenceStrength.MECHANISTIC,
         confidence=Confidence.LOW,
-        evidence=[EvidenceRef(source_id="IPCC_2022_AR6_WG3_Ch7")],
+        evidence=[EvidenceRef(source_id="IPCC_2022_AR6_WG3_Ch7", role="primary")],
         mechanism=(
             "Biochar is a highly recalcitrant form of carbon that resists microbial "
             "decomposition for centuries, so its addition directly and durably raises the "

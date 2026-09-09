@@ -50,7 +50,14 @@ from src.graph.propagate import (
     limiting_factor,
     rank_interventions,
 )
-from src.graph.schemas import CausalEdge, Confidence, Measurement, Provenance, SiteState
+from src.graph.schemas import (
+    CausalEdge,
+    Confidence,
+    Measurement,
+    Provenance,
+    SiteState,
+    implausible_combinations,
+)
 from src.retrieval.bind import bind_evidence
 from src.retrieval.search import RERANK_FLOOR, RetrievedChunk, has_support, search
 
@@ -63,6 +70,37 @@ DEFAULT_MODEL = "anthropic/claude-sonnet-5"
 # Wall-clock ceiling on one model call. A conversational turn that waits
 # longer than this has already failed as a conversation.
 LLM_TIMEOUT_S = 20.0
+
+# How hard a rate-limited call is retried before the caller falls back. The
+# budget is per call and deliberately small: a conversational turn that waits
+# out three rate limits has already failed as a conversation, so this buys a
+# verdict for a bounded delay rather than waiting indefinitely for one.
+LLM_RATE_LIMIT_RETRIES = 3
+LLM_RATE_LIMIT_DEFAULT_WAIT_S = 20.0
+LLM_RATE_LIMIT_WAIT_MARGIN_S = 2.0
+LLM_RATE_LIMIT_MAX_WAIT_S = 45.0
+
+_LLM_RETRY_AFTER = re.compile(r"try again in ([\d.]+)\s*s", re.I)
+
+
+def _rate_limited(error: Exception) -> bool:
+    return "ratelimit" in type(error).__name__.lower() or "rate_limit" in str(error).lower()
+
+
+def _rate_limit_wait(error: Exception) -> float:
+    """How long the provider says to wait, bounded.
+
+    The hint is the time until the window has room for the request that was
+    refused, so it is honoured where given rather than replaced with a fixed
+    backoff that would either overshoot or retry into the same wall.
+    """
+    match = _LLM_RETRY_AFTER.search(str(error))
+    hinted = (
+        float(match.group(1)) + LLM_RATE_LIMIT_WAIT_MARGIN_S
+        if match
+        else LLM_RATE_LIMIT_DEFAULT_WAIT_S
+    )
+    return min(hinted, LLM_RATE_LIMIT_MAX_WAIT_S)
 
 # Per-API ceiling in acquire. Deliberately short: the acquire node exists to
 # save the user typing, not to be the critical path, so an API that has not
@@ -144,21 +182,34 @@ def _llm(system: str, user: str, json_only: bool) -> str | None:
     """
     if not llm_available():
         return None
-    try:
-        import litellm
 
-        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        response = litellm.completion(
-            model=model_name(),
-            messages=messages,
-            timeout=LLM_TIMEOUT_S,
-            max_tokens=1024,
-            temperature=0.0,
-            **({"response_format": {"type": "json_object"}} if json_only else {}),
-        )
+    import litellm
+
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    for attempt in range(LLM_RATE_LIMIT_RETRIES + 1):
+        try:
+            response = litellm.completion(
+                model=model_name(),
+                messages=messages,
+                timeout=LLM_TIMEOUT_S,
+                max_tokens=1024,
+                temperature=0.0,
+                **({"response_format": {"type": "json_object"}} if json_only else {}),
+            )
+        except Exception as error:  # noqa: BLE001 - every caller has a fallback
+            # A rate limit is a queue, not a failure. Waiting it out matters
+            # because the fallback is silent: a lost entailment call leaves
+            # the critic counting a passage above the support floor as
+            # support without judging whether it entails the claim, so the
+            # grounding figure reports a check that never ran. Measured on a
+            # batch eval against an 8000 tokens-per-minute allowance, 199 of
+            # 220 entailment calls were being lost this way.
+            if _rate_limited(error) and attempt < LLM_RATE_LIMIT_RETRIES:
+                time.sleep(_rate_limit_wait(error))
+                continue
+            return None
         return response.choices[0].message.content
-    except Exception:
-        return None
+    return None
 
 
 def llm_json(system: str, user: str) -> dict[str, Any] | None:
@@ -549,7 +600,19 @@ def intake_node(state: ConversationState) -> dict[str, Any]:
     if revised and baseline is None:
         baseline = previous
 
-    return {
+    # Internally inconsistent measurements are raised here rather than
+    # downstream, because everything downstream reasons FROM them: a
+    # diagnosis built on a soil carbon figure that the rainfall cannot
+    # support is confidently wrong in a way no later stage can detect. The
+    # note goes into the report whatever else happens, and the first
+    # unasked one becomes the turn's question, ahead of any
+    # value-of-information question, since checking a number is worth more
+    # than filling a gap next to it.
+    asked = set(state.get("asked_about", []))
+    inconsistencies = [note for note in implausible_combinations(updated) if note not in asked]
+    notes.extend(inconsistencies)
+
+    update: dict[str, Any] = {
         "site": updated,
         "turn": state.get("turn", 0) + 1,
         "site_history": [previous],
@@ -562,6 +625,14 @@ def intake_node(state: ConversationState) -> dict[str, Any]:
         "belief_diff": None,
         "pending_question": None,
     }
+    if inconsistencies:
+        # Recorded in asked_about by its own text, so the same inconsistency
+        # is put to the user once. An answer that leaves the figures as they
+        # were is still an answer, and re-asking it every turn would be the
+        # system arguing with the person who measured the field.
+        update["pending_question"] = inconsistencies[0]
+        update["asked_about"] = [inconsistencies[0]]
+    return update
 
 
 def _differs(a: Measurement, b: Measurement) -> bool:
@@ -1027,6 +1098,13 @@ def gap_analysis_node(state: ConversationState) -> dict[str, Any]:
     site: SiteState = state["site"]
     asked = set(state.get("asked_about", []))
     graph = build_graph()
+
+    # A question intake already raised stands. Intake asks only about an
+    # internal inconsistency in what it was just told, and checking a figure
+    # that may be wrong outranks filling in one that is merely missing:
+    # value of information assumes the values it has are true.
+    if state.get("pending_question"):
+        return {}
 
     if len(asked) >= MAX_QUESTIONS:
         return {

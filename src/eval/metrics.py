@@ -117,9 +117,11 @@ class Scores(BaseModel):
 # scored the system as flagging an implausible input on sites where it does
 # nothing of the kind.
 _IMPLAUSIBLE = re.compile(
-    r"implausib|not plausible|physically unlikely|cannot both be|"
-    r"mutually inconsistent|inconsistent with (?:each other|the other|that)|"
-    r"one of these (?:figures|numbers|values) is",
+    r"implausib|not plausible|physically unlikely|physically inconsistent|"
+    r"cannot both be|mutually inconsistent|"
+    r"inconsistent with (?:each other|the other|that)|"
+    r"one of these (?:figures|numbers|values) is|"
+    r"is unusual[,.]|unusual and warrants verification|warrants verification",
     re.I,
 )
 _EXTRAPOLATION = re.compile(
@@ -164,7 +166,11 @@ def detect_flags(evidence: FlagEvidence) -> set[str]:
         raised.add("implausible_input")
     if _EXTRAPOLATION.search(evidence.text):
         raised.add("extrapolation")
-    if _SPARSE.search(evidence.text) or evidence.asked_question:
+    # Sparse input is read off the text alone. It used to also be raised by
+    # the response having asked a question, which was wrong once intake could
+    # ask about an internal inconsistency: that question says the inputs
+    # disagree, not that they are missing.
+    if _SPARSE.search(evidence.text):
         raised.add("sparse_input")
     if _DEFAULT_DIAGNOSIS.search(evidence.text):
         raised.add("default_diagnosis")

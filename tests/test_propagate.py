@@ -385,6 +385,7 @@ def test_rank_interventions_is_identical_across_calls_with_the_same_seed(
         assert {t: r.p50 for t, r in a.effects.items()} == {t: r.p50 for t, r in b.effects.items()}
 
 
+@pytest.mark.slow
 def test_demo_output_is_identical_across_python_hash_seeds() -> None:
     """The end-to-end guarantee, across processes.
 

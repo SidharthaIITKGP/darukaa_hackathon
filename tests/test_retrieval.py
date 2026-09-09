@@ -117,6 +117,7 @@ def test_rrf_rewards_agreement_between_retrievers() -> None:
     assert compared > 0, "no comparable pair found"
 
 
+@pytest.mark.slow
 def test_reranking_changes_the_ordering() -> None:
     changed = False
     for query in RERANK_QUERIES:
@@ -155,6 +156,7 @@ def test_flag_scope_leaves_global_evidence_in_scope() -> None:
     assert all(not c.out_of_scope and c.scope_note is None for c in globals_)
 
 
+@pytest.mark.slow
 def test_bind_evidence_uses_the_edges_own_sources() -> None:
     edge = _legume_soc_edge()
     cited = {ref.source_id for ref in edge.evidence}
@@ -169,6 +171,7 @@ def test_bind_evidence_uses_the_edges_own_sources() -> None:
     assert all(c.tier == "meta_analysis" for c in chunks)
 
 
+@pytest.mark.slow
 def test_bind_evidence_flags_extrapolation_on_a_semi_arid_site() -> None:
     edge = _legume_soc_edge()
     chunks = bind_evidence(edge, _deccan_site(), k=3)
@@ -194,6 +197,7 @@ def test_rrf_only_search_is_well_under_a_second() -> None:
     assert timing.total_ms < 1000.0
 
 
+@pytest.mark.slow
 def test_has_support_separates_covered_from_uncovered_topics() -> None:
     """Both rerankers have to agree on this, because it is a claim about the
     corpus rather than about a model: the corpus has cover-crop

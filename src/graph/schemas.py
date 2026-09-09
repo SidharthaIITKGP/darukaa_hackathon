@@ -187,6 +187,114 @@ class SiteState(BaseModel):
         return "humid"
 
 
+# Thresholds for the implausibility checks below. Modelling assumptions, not
+# published constants, and deliberately loose: the job is to catch a figure
+# that is almost certainly a transcription error, not to police the edges of
+# what soils do. A site that trips one of these may still be real, which is
+# why the output is a question and never a rejection.
+IMPLAUSIBLE_SOC_PCT = 1.5
+IMPLAUSIBLE_SOC_RAINFALL_MM = 300.0
+IMPLAUSIBLE_ACID_PH = 5.5
+IMPLAUSIBLE_ACID_RAINFALL_MM = 400.0
+# A landscape-scale species count above which "high richness" is the claim
+# being made. Coarse by necessity, since richness has no natural scale
+# without a taxon and a survey protocol, so a qualitative band is preferred
+# where the site carries one.
+IMPLAUSIBLE_RICHNESS_COUNT = 100.0
+IMPLAUSIBLE_EDGE_DENSITY = 0.7
+IMPLAUSIBLE_LARGEST_PATCH_INDEX = 20.0
+
+_HIGH_BANDS = ("high", "very high")
+_LOW_BANDS = ("low", "very low")
+
+
+def _numeric(measurement: "Measurement | None") -> float | None:
+    return measurement.value if measurement is not None else None
+
+
+def _is_high(measurement: "Measurement | None", threshold: float) -> bool:
+    if measurement is None:
+        return False
+    if measurement.band is not None:
+        return measurement.band.lower() in _HIGH_BANDS
+    return measurement.value is not None and measurement.value > threshold
+
+
+def _is_low(measurement: "Measurement | None", threshold: float) -> bool:
+    if measurement is None:
+        return False
+    if measurement.band is not None:
+        return measurement.band.lower() in _LOW_BANDS
+    return measurement.value is not None and measurement.value < threshold
+
+
+def implausible_combinations(site: SiteState) -> list[str]:
+    """Physically inconsistent pairs of measurements, phrased as questions.
+
+    A site can be internally contradictory while every field in it is
+    individually valid, and a system that reasons about sites has to notice.
+    2.5% soil organic carbon under 180mm of rainfall is the standing example:
+    both numbers are ordinary on their own, and together they describe a
+    place that does not exist without irrigation or an amendment history.
+
+    Each returned string is a question rather than a verdict, because the
+    combination is unusual rather than impossible and the person who stood in
+    the field knows things this system does not. Silence would be worse than
+    either: it would mean reasoning downstream of a number that should have
+    been checked first.
+
+    Returns an empty list when nothing conflicts, which is the normal case.
+    """
+    notes: list[str] = []
+
+    soc = _numeric(site.soil_organic_carbon_pct)
+    rainfall = _numeric(site.annual_rainfall_mm)
+    ph = _numeric(site.ph)
+
+    if (
+        soc is not None
+        and rainfall is not None
+        and soc > IMPLAUSIBLE_SOC_PCT
+        and rainfall < IMPLAUSIBLE_SOC_RAINFALL_MM
+    ):
+        notes.append(
+            f"A soil organic carbon of {soc:g}% under {rainfall:g}mm annual rainfall is "
+            f"unusual, since carbon accrual at that level normally requires more biomass "
+            f"production than that rainfall supports. Is the site irrigated, does it "
+            f"waterlog seasonally, or has it had heavy organic amendment? Or was that "
+            f"figure from a different depth or a different plot?"
+        )
+
+    if (
+        ph is not None
+        and rainfall is not None
+        and ph < IMPLAUSIBLE_ACID_PH
+        and rainfall < IMPLAUSIBLE_ACID_RAINFALL_MM
+    ):
+        notes.append(
+            f"A pH of {ph:g} under {rainfall:g}mm annual rainfall is unusual. Acidification "
+            f"is normally driven by base cations leaching out of the profile, which takes "
+            f"more water than falls here, so dry soils tend to run neutral to alkaline. Is "
+            f"there an acidifying input such as heavy ammonium fertiliser or mine spoil, or "
+            f"could the reading be from a different plot?"
+        )
+
+    if (
+        _is_high(site.observed_species_richness, IMPLAUSIBLE_RICHNESS_COUNT)
+        and _is_high(site.edge_density, IMPLAUSIBLE_EDGE_DENSITY)
+        and _is_low(site.largest_patch_index, IMPLAUSIBLE_LARGEST_PATCH_INDEX)
+    ):
+        notes.append(
+            "High species richness in a severely fragmented mosaic, with high edge density "
+            "and no large remaining patch, is unusual and warrants verification. Fragmented "
+            "landscapes usually lose interior and area-sensitive species first. Does the "
+            "richness figure come from a survey on this land, or from records pooled over a "
+            "wider area that includes habitat the site itself does not have?"
+        )
+
+    return notes
+
+
 class Conditions(BaseModel):
     """Preconditions under which an edge holds. None means unconstrained."""
 

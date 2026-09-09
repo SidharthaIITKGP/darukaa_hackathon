@@ -352,15 +352,16 @@ def contradictory_input() -> EvalSite:
         ),
         expected_limiting_factor=None,
         expected_top_intervention_class=None,
-        must_flag=["implausible_input"],
+        must_flag=["implausible_input", "asks_clarifying_question"],
         notes=(
             "2.5% soil organic carbon under 180mm of rainfall is not a site, it is a "
             "typo. Arid systems do not fix enough carbon to hold that stock and do not "
             "have the moisture to stabilise it, so one of the two numbers is wrong and "
             "there is no way to tell which. The correct response is to say the pairing is "
-            "implausible and ask which figure to trust. No diagnosis expectation is set, "
-            "because every diagnosis from these inputs is reasoning from a number that "
-            "should not have been accepted."
+            "unusual and ask which figure to trust, which is why this site requires both "
+            "the flag and a question. No diagnosis expectation is set, because every "
+            "diagnosis from these inputs is reasoning from a number that should not have "
+            "been accepted without a check."
         ),
     )
 

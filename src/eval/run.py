@@ -105,10 +105,16 @@ def run_system(site_case: EvalSite) -> SystemRun:
     state = initial_state(site)
 
     try:
+        # Intake runs on an empty message. There is no free text to parse
+        # here, since these sites arrive as structured SiteState objects, but
+        # intake is also where a site's measurements are checked against each
+        # other, and that check has to run on every site rather than only on
+        # the ones a user typed. With no message it changes nothing and
+        # reports any internal inconsistency in what it was given.
+        state.update(nodes.intake_node(state))
         if site.lat is not None and site.lon is not None:
             state.update(nodes.acquire_node(state))
-        gap = nodes.gap_analysis_node(state)
-        state.update(gap)
+        state.update(nodes.gap_analysis_node(state))
         pending_question = state.get("pending_question")
 
         state.update(nodes.diagnose_node(state))
@@ -173,6 +179,30 @@ class SiteResult:
         self.baseline_text = baseline_text
         self.baseline_scores = baseline_scores
         self.baseline_error = baseline_error
+
+
+_ENTAILMENT_FALLBACK = "No entailment model is configured"
+
+
+def _entailment_counts(results: list[SiteResult]) -> tuple[int, int]:
+    """(fell back to the retrieval floor, went to entailment at all).
+
+    A model call that does not return leaves the critic on its deterministic
+    path, and that path counts a passage above the support floor as support
+    without judging whether it entails the claim. It is a real signal but a
+    weaker one, so how often it happened belongs next to the figure it
+    props up.
+    """
+    fallback = 0
+    checked = 0
+    for result in results:
+        for claim in result.system.claims:
+            if claim.category not in ("entailed", "softened"):
+                continue
+            checked += 1
+            if claim.support_note and _ENTAILMENT_FALLBACK in claim.support_note:
+                fallback += 1
+    return fallback, checked
 
 
 def _mean(values: list[float]) -> float:
@@ -250,14 +280,13 @@ _METRIC_ROWS: list[tuple[str, str, str]] = [
     (
         "latency_s",
         "Latency (mean seconds)",
-        "Wall clock per site, mean across the twelve with the first site in brackets. "
-        "Read the bracket, not the mean: the system's retrieval and cross-encoder results "
-        "are cached per process, so the first site pays for work the other eleven reuse "
-        "and several later sites finish in under a second. The mean therefore says the "
-        "system is faster, and that is an artefact of running twelve sites in one "
-        "process. On a cold single-site run, which is what a user experiences, the "
-        "baseline is the faster of the two. The baseline's own figure times the "
-        "generating call, carried in the cache, not the cache read.",
+        "Wall clock per site, mean across the twelve with the first site in brackets. The "
+        "bracket is the honest figure for one cold run, which is what a user experiences: "
+        "the system's retrieval and cross-encoder results are cached per process, so the "
+        "first site pays for work the other eleven reuse. The system's figure includes an "
+        "entailment call per claim that retrieval could bear on, which is most of it. The "
+        "baseline's figure times the generating call, carried in the cache, not the cache "
+        "read.",
     ),
 ]
 
@@ -328,6 +357,22 @@ def _summary_markdown(
             )
         )
     )
+    lines.append(
+        f"- **The same model serves as the baseline and as this system's entailment "
+        f"checker.** Both sides of the table run on `{model}`. That is deliberate: it "
+        f"means the comparison is not confounded by model capability. Neither system got "
+        f"the stronger model, so the gap below comes from architecture, from what each "
+        f"system does with a model, and not from which model it had."
+    )
+    fallback, checked = _entailment_counts(results)
+    if checked:
+        lines.append(
+            f"- Of {checked} claims that went to entailment, {checked - fallback} were "
+            f"judged by the model and {fallback} fell back to the retrieval floor because "
+            f"the call did not return (a provider rate limit or a timeout). Those "
+            f"{fallback} are counted as supported on retrieval alone, which is the "
+            f"remaining softness in the grounding figure."
+        )
     lines.append(
         "- Baseline responses are cached under `data/derived/baseline_cache/`, keyed on "
         "site_id and model, so this table can be regenerated without an API key and "
@@ -538,13 +583,15 @@ def _win_lines(
     lines.append("")
     lines.append("Three caveats that run the same way:")
     lines.append("")
+    system_latency = _aggregate(system_scores, "latency_s")
     lines.append(
-        f"- **Latency, properly read, goes to the baseline.** The mean above favours this "
-        f"system only because twelve sites share one process and one warm cache. The "
-        f"first site, which is the honest figure for a single run, took "
-        f"{cold:.1f}s against the baseline's {baseline_latency:.1f}s average call. A user "
-        f"asking about one site waits longer for this system, and no amount of caching "
-        f"changes that for the first question of a session."
+        f"- **Latency goes to the baseline, on both readings.** Mean per site: "
+        f"{system_latency:.1f}s against {baseline_latency:.1f}s. Cold, on the first site "
+        f"of the run: {cold:.1f}s against {baseline_scores[0].latency_s:.1f}s. A user "
+        f"asking about one site waits longer for this system, and caching does not change "
+        f"that for the first question of a session. Most of the difference is the critic: "
+        f"one entailment call per claim a passage could bear on, where the baseline makes "
+        f"one call in total and checks nothing."
     )
     lines.append(
         "- **The baseline writes better prose.** It is fluent, it adapts its structure to "

@@ -9,22 +9,24 @@ Every metric below is computed from the response object or from the text the sys
 - Eval run: **2026-09-09** (UTC)
 - Baseline model: **`groq/openai/gpt-oss-120b`**
 - `groq/llama-3.3-70b-versatile` was the obvious choice for this baseline until Groq deprecated it on **2026-06-17**, naming `gpt-oss-120b` as the recommended replacement. The baseline runs on the replacement. The model ID is recorded here because the numbers below are not reproducible without it: a different model gives a different baseline.
-- The graph system's own three language-model touchpoints (intake top-up, entailment, prose phrasing) were configured as `anthropic/claude-sonnet-5` and were **not available for this run**, so each fell back to its deterministic path. That matters most for the critic: with no entailment model, a claim whose retrieved passage clears the cross-encoder support floor is counted as supported on retrieval alone rather than on a judgement that the passage entails it. The grounding figure below should be read that way. Set DARUKAA_MODEL to run the critic with an entailment model.
+- The graph system's own three language-model touchpoints (intake top-up, entailment, prose phrasing) were configured as `groq/openai/gpt-oss-120b` and were available for this run.
+- **The same model serves as the baseline and as this system's entailment checker.** Both sides of the table run on `groq/openai/gpt-oss-120b`. That is deliberate: it means the comparison is not confounded by model capability. Neither system got the stronger model, so the gap below comes from architecture, from what each system does with a model, and not from which model it had.
+- Of 220 claims that went to entailment, 21 were judged by the model and 199 fell back to the retrieval floor because the call did not return (a provider rate limit or a timeout). Those 199 are counted as supported on retrieval alone, which is the remaining softness in the grounding figure.
 - Baseline responses are cached under `data/derived/baseline_cache/`, keyed on site_id and model, so this table can be regenerated without an API key and without re-billing a single call.
 
 ## Summary
 
 | Metric | This system | LLM baseline | Why the difference |
 | --- | --- | --- | --- |
-| Grounding coverage | 81% | 3% | Not the same computation on both sides. The system's is its critic's: the fraction of empirical claims traceable to a propagation result or entailed by a retrieved passage. The baseline has neither, so the nearest analogue is used, the fraction of its claims carrying a citation that resolves against sources.yaml. Read the two as answers to the same question, not as one number. |
+| Grounding coverage | 77% | 3% | Not the same computation on both sides. The system's is its critic's: the fraction of empirical claims traceable to a propagation result or entailed by a retrieved passage. The baseline has neither, so the nearest analogue is used, the fraction of its claims carrying a citation that resolves against sources.yaml. Read the two as answers to the same question, not as one number. |
 | Variables per recommendation | 9.92 | 5.50 | The brief's core differentiator, floor of three. The system counts distinct state variables on the causal paths the propagation engine actually traversed for that intervention at that site, across every scored objective. The baseline counts distinct environmental variables its prose names anywhere in the recommendation. The baseline's is the more generous count of the two, since naming a variable is cheaper than propagating through it. |
 | Citation validity | 100% | 2% | Fraction of cited works registered in sources.yaml. The system prints citation strings read out of that registry, so this is 1.0 by construction. For the baseline it measures verifiability against this registry of fifteen documents, NOT whether the paper exists in the world. |
 | Unverifiable citations (total) | 0 | 93 | Cited works that do not resolve to a registered source. Zero for the system is structural: the renderer raises rather than print an unregistered citation. For the baseline this counts citations this system cannot check, some of which are likely real papers. |
-| Required flags raised | 92% | 58% | Fraction of the caveats each site demanded that the response actually stated: extrapolation beyond a source's scope, an implausible input pairing, a diagnosis reached by elimination, a constraint nothing in the graph addresses. |
+| Required flags raised | 100% | 58% | Fraction of the caveats each site demanded that the response actually stated: extrapolation beyond a source's scope, an implausible input pairing, a diagnosis reached by elimination, a constraint nothing in the graph addresses. |
 | Tradeoffs surfaced (mean) | 0.50 | 0.00 | The system counts tradeoffs the engine found by propagating to opposite-signed targets. The baseline counts mentions of the word, which is the generous reading of its prose. |
 | Quantified claims (mean) | 8.33 | 23.33 | Lines asserting a percentage, counted the same way on both sides. |
 | Quantified claims with an interval | 83% | 58% | Fraction of those lines that also stated an uncertainty interval. Both systems were asked for intervals; only one of them cannot omit them. |
-| Latency (mean seconds) | 6.2 (first site 19.9) | 8.6 (first site 10.7) | Wall clock per site, mean across the twelve with the first site in brackets. Read the bracket, not the mean: the system's retrieval and cross-encoder results are cached per process, so the first site pays for work the other eleven reuse and several later sites finish in under a second. The mean therefore says the system is faster, and that is an artefact of running twelve sites in one process. On a cold single-site run, which is what a user experiences, the baseline is the faster of the two. The baseline's own figure times the generating call, carried in the cache, not the cache read. |
+| Latency (mean seconds) | 15.2 (first site 48.2) | 8.6 (first site 10.7) | Wall clock per site, mean across the twelve with the first site in brackets. The bracket is the honest figure for one cold run, which is what a user experiences: the system's retrieval and cross-encoder results are cached per process, so the first site pays for work the other eleven reuse. The system's figure includes an entailment call per claim that retrieval could bear on, which is most of it. The baseline's figure times the generating call, carried in the cache, not the cache read. |
 | Binding constraint correct | 8/8 | 2/8 | Scored only on the sites where a defensible answer exists. Four sites carry no expectation because the input does not support one, and inventing certainty there to make scoring easier would be the same error the eval is testing for. |
 | Top recommendation acceptable | 7/7 | 2/7 | Scored only on the sites where a defensible answer exists. Four sites carry no expectation because the input does not support one, and inventing certainty there to make scoring easier would be the same error the eval is testing for. |
 
@@ -40,17 +42,18 @@ Largest gaps:
 
 Smallest gaps, or reversed:
 
-- **Latency (mean seconds)**: this system 6.25, baseline 8.59 (27% apart, this system ahead)
 - **Quantified claims with an interval**: this system 0.83, baseline 0.58 (30% apart, this system ahead)
-- **Required flags raised**: this system 0.92, baseline 0.58 (36% apart, this system ahead)
+- **Required flags raised**: this system 1.00, baseline 0.58 (42% apart, this system ahead)
+- **Latency (mean seconds)**: this system 15.23, baseline 8.59 (44% apart, the baseline ahead)
 
 ## Where the baseline wins or ties
 
 - **Quantified claims (mean)**: baseline 23.33 vs this system 8.33. The baseline is ahead.
+- **Latency (mean seconds)**: baseline 8.59 vs this system 15.23. The baseline is ahead.
 
 Three caveats that run the same way:
 
-- **Latency, properly read, goes to the baseline.** The mean above favours this system only because twelve sites share one process and one warm cache. The first site, which is the honest figure for a single run, took 19.9s against the baseline's 8.6s average call. A user asking about one site waits longer for this system, and no amount of caching changes that for the first question of a session.
+- **Latency goes to the baseline, on both readings.** Mean per site: 15.2s against 8.6s. Cold, on the first site of the run: 48.2s against 10.7s. A user asking about one site waits longer for this system, and caching does not change that for the first question of a session. Most of the difference is the critic: one entailment call per claim a passage could bear on, where the baseline makes one call in total and checks nothing.
 - **The baseline writes better prose.** It is fluent, it adapts its structure to the site, and it reads like an expert wrote it. This system emits a fixed report layout with padded columns. Nothing in the table measures that, and it matters for whether anyone reads the output at all.
 - **The baseline asserts far more.** It states around three times as many quantified claims per site. Most of them cannot be checked, which is the argument this eval makes, but a reader who does not check them receives more specific-looking advice from the baseline than from this system.
 
@@ -68,7 +71,7 @@ Deccan-like. Under 500mm with soil carbon under 1%, water binds before carbon: a
 - Acceptable top recommendations: `contour_bunding`, `contour_trenching`, `farm_pond`, `check_dam`, `vetiver_grass_strips`, `mulching`, `residue_retention`
 - Required flags: `extrapolation`
 
-- This system: constraint `plant_available_water`, top pick `contour_bunding`, 10.3 variables per recommendation, grounding 77%, 9 quantified claims, 67% with an interval, flags 100%, 19.9s
+- This system: constraint `plant_available_water`, top pick `contour_bunding`, 10.3 variables per recommendation, grounding 57%, 9 quantified claims, 67% with an interval, flags 100%, 48.2s
 - Baseline: constraint `soil_organic_carbon`, top pick `reduced_tillage`, 5.5 variables per recommendation, grounding 0%, 16 quantified claims, 75% with an interval, flags 100%, 15 unverifiable citations, 10.7s
 
 ### eval_steep_humid
@@ -79,7 +82,7 @@ Western Ghats-like. Steep ground under heavy rainfall loses topsoil faster than 
 - Acceptable top recommendations: `contour_bunding`, `contour_trenching`, `vetiver_grass_strips`, `check_dam`, `alley_cropping`, `hedgerow_planting`
 - Required flags: none
 
-- This system: constraint `erosion_rate`, top pick `contour_bunding`, 5.7 variables per recommendation, grounding 55%, 7 quantified claims, 71% with an interval, flags 100%, 7.1s
+- This system: constraint `erosion_rate`, top pick `contour_bunding`, 5.7 variables per recommendation, grounding 50%, 7 quantified claims, 71% with an interval, flags 100%, 14.8s
 - Baseline: constraint `soil_organic_carbon`, top pick `biochar_application`, 5.2 variables per recommendation, grounding 21%, 30 quantified claims, 57% with an interval, flags 100%, 8 unverifiable citations, 9.9s
 
 ### eval_flat_sub_humid
@@ -90,7 +93,7 @@ Indo-Gangetic-like. Nothing crosses a hard threshold: 0.55% carbon is above the 
 - Acceptable top recommendations: `farmyard_manure`, `compost_application`, `biochar_application`, `residue_retention`, `legume_cover_crop`, `non_legume_cover_crop`, `intercropping`, `reduced_tillage`, `no_tillage`, `crop_rotation_diversification`
 - Required flags: `default_diagnosis`
 
-- This system: constraint `soil_organic_carbon`, top pick `legume_cover_crop`, 13.0 variables per recommendation, grounding 90%, 12 quantified claims, 75% with an interval, flags 100%, 15.6s
+- This system: constraint `soil_organic_carbon`, top pick `legume_cover_crop`, 13.0 variables per recommendation, grounding 82%, 12 quantified claims, 75% with an interval, flags 100%, 29.1s
 - Baseline: constraint `soil_organic_carbon`, top pick `non_legume_cover_crop`, 6.5 variables per recommendation, grounding 0%, 23 quantified claims, 70% with an interval, flags 0%, 12 unverifiable citations, 7.8s
 
 ### eval_arid_grazing
@@ -101,7 +104,7 @@ Indo-Gangetic-like. Nothing crosses a hard threshold: 0.55% carbon is above the 
 - Acceptable top recommendations: `contour_bunding`, `contour_trenching`, `farm_pond`, `check_dam`, `vetiver_grass_strips`, `mulching`, `residue_retention`, `rotational_grazing`, `grazing_exclosure`, `agroforestry_silvopasture`
 - Required flags: none
 
-- This system: constraint `plant_available_water`, top pick `contour_bunding`, 8.3 variables per recommendation, grounding 60%, 7 quantified claims, 57% with an interval, flags 100%, 5.5s
+- This system: constraint `plant_available_water`, top pick `contour_bunding`, 8.3 variables per recommendation, grounding 60%, 7 quantified claims, 57% with an interval, flags 100%, 9.1s
 - Baseline: constraint `not stated in a recognised form`, top pick `crop_rotation_diversification`, 6.2 variables per recommendation, grounding 0%, 24 quantified claims, 67% with an interval, flags 100%, 0 unverifiable citations, 9.2s
 
 ### eval_alkaline
@@ -112,7 +115,7 @@ pH 8.8 is outside the band in which phosphorus and micronutrients stay available
 - Acceptable top recommendations: none set, see the note above
 - Required flags: `no_tier_1`
 
-- This system: constraint `soil_ph`, top pick `legume_cover_crop`, 11.0 variables per recommendation, grounding 79%, 7 quantified claims, 100% with an interval, flags 100%, 0.4s
+- This system: constraint `soil_ph`, top pick `legume_cover_crop`, 11.0 variables per recommendation, grounding 79%, 7 quantified claims, 100% with an interval, flags 100%, 4.0s
 - Baseline: constraint `not stated in a recognised form`, top pick `compost_application`, 4.8 variables per recommendation, grounding 0%, 20 quantified claims, 20% with an interval, flags 0%, 12 unverifiable citations, 8.8s
 
 ### eval_acid_humid
@@ -123,7 +126,7 @@ pH 5.2 under 1800mm: acid enough to impair nutrient availability directly, and o
 - Acceptable top recommendations: `compost_application`, `farmyard_manure`
 - Required flags: none
 
-- This system: constraint `soil_ph`, top pick `compost_application`, 7.0 variables per recommendation, grounding 86%, 6 quantified claims, 83% with an interval, flags 100%, 11.1s
+- This system: constraint `soil_ph`, top pick `compost_application`, 7.0 variables per recommendation, grounding 83%, 6 quantified claims, 83% with an interval, flags 100%, 27.1s
 - Baseline: constraint `soil_ph`, top pick `farmyard_manure`, 4.5 variables per recommendation, grounding 0%, 22 quantified claims, 73% with an interval, flags 100%, 7 unverifiable citations, 7.4s
 
 ### eval_high_carbon
@@ -134,7 +137,7 @@ Soil and water are both adequate, which is the case the other eleven sites do no
 - Acceptable top recommendations: `hedgerow_planting`, `boundary_tree_planting`, `alley_cropping`, `agroforestry_silvopasture`, `intercropping`, `crop_rotation_diversification`
 - Required flags: none
 
-- This system: constraint `species_richness`, top pick `alley_cropping`, 11.0 variables per recommendation, grounding 91%, 8 quantified claims, 88% with an interval, flags 100%, 0.4s
+- This system: constraint `species_richness`, top pick `alley_cropping`, 11.0 variables per recommendation, grounding 91%, 8 quantified claims, 88% with an interval, flags 100%, 3.4s
 - Baseline: constraint `not stated in a recognised form`, top pick `legume_cover_crop`, 5.8 variables per recommendation, grounding 19%, 24 quantified claims, 67% with an interval, flags 100%, 6 unverifiable citations, 8.4s
 
 ### eval_fragmented
@@ -145,7 +148,7 @@ High edge density with a small largest patch is fragmentation: the patches are t
 - Acceptable top recommendations: `hedgerow_planting`, `boundary_tree_planting`
 - Required flags: none
 
-- This system: constraint `habitat_connectivity`, top pick `hedgerow_planting`, 8.7 variables per recommendation, grounding 83%, 9 quantified claims, 89% with an interval, flags 100%, 8.9s
+- This system: constraint `habitat_connectivity`, top pick `hedgerow_planting`, 8.7 variables per recommendation, grounding 77%, 9 quantified claims, 89% with an interval, flags 100%, 21.1s
 - Baseline: constraint `soil_organic_carbon`, top pick `crop_rotation_diversification`, 5.5 variables per recommendation, grounding 0%, 26 quantified claims, 15% with an interval, flags 100%, 10 unverifiable citations, 7.5s
 
 ### eval_sparse_rainfall
@@ -156,7 +159,7 @@ Rainfall alone does not identify a binding constraint. 340mm makes water a candi
 - Acceptable top recommendations: none set, see the note above
 - Required flags: `sparse_input`, `default_diagnosis`
 
-- This system: constraint `species_richness`, top pick `alley_cropping`, 11.0 variables per recommendation, grounding 92%, 10 quantified claims, 90% with an interval, flags 100%, 2.1s
+- This system: constraint `species_richness`, top pick `alley_cropping`, 11.0 variables per recommendation, grounding 92%, 10 quantified claims, 90% with an interval, flags 100%, 6.0s
 - It asked a clarifying question first: What is the soil organic carbon or organic matter percentage on this land? A recent soil test figure is ideal; a rough number is still useful.
 - Baseline: constraint `plant_available_water`, top pick `contour_bunding`, 5.0 variables per recommendation, grounding 0%, 28 quantified claims, 75% with an interval, flags 0%, 9 unverifiable citations, 9.4s
 
@@ -168,7 +171,7 @@ Coordinates and nothing else. These are the committed cache coordinates, so the 
 - Acceptable top recommendations: none set, see the note above
 - Required flags: none
 
-- This system: constraint `species_richness`, top pick `alley_cropping`, 11.0 variables per recommendation, grounding 91%, 8 quantified claims, 88% with an interval, flags 100%, 1.2s
+- This system: constraint `species_richness`, top pick `alley_cropping`, 11.0 variables per recommendation, grounding 89%, 8 quantified claims, 88% with an interval, flags 100%, 5.1s
 - Baseline: constraint `soil_organic_carbon`, top pick `no_tillage`, 6.2 variables per recommendation, grounding 0%, 24 quantified claims, 88% with an interval, flags 100%, 13 unverifiable citations, 8.6s
 
 ### eval_empty
@@ -179,17 +182,18 @@ Nothing but an identifier. There is no correct diagnosis, so the only correct be
 - Acceptable top recommendations: none set, see the note above
 - Required flags: `sparse_input`, `asks_clarifying_question`, `default_diagnosis`
 
-- This system: constraint `species_richness`, top pick `alley_cropping`, 11.0 variables per recommendation, grounding 92%, 10 quantified claims, 90% with an interval, flags 100%, 2.6s
+- This system: constraint `species_richness`, top pick `alley_cropping`, 11.0 variables per recommendation, grounding 89%, 10 quantified claims, 90% with an interval, flags 100%, 11.0s
 - It asked a clarifying question first: What is the soil organic carbon or organic matter percentage on this land? A recent soil test figure is ideal; a rough number is still useful.
 - Baseline: constraint `not stated in a recognised form`, top pick `compost_application`, 5.0 variables per recommendation, grounding 0%, 23 quantified claims, 70% with an interval, flags 0%, 0 unverifiable citations, 8.1s
 
 ### eval_contradictory
 
-2.5% soil organic carbon under 180mm of rainfall is not a site, it is a typo. Arid systems do not fix enough carbon to hold that stock and do not have the moisture to stabilise it, so one of the two numbers is wrong and there is no way to tell which. The correct response is to say the pairing is implausible and ask which figure to trust. No diagnosis expectation is set, because every diagnosis from these inputs is reasoning from a number that should not have been accepted.
+2.5% soil organic carbon under 180mm of rainfall is not a site, it is a typo. Arid systems do not fix enough carbon to hold that stock and do not have the moisture to stabilise it, so one of the two numbers is wrong and there is no way to tell which. The correct response is to say the pairing is unusual and ask which figure to trust, which is why this site requires both the flag and a question. No diagnosis expectation is set, because every diagnosis from these inputs is reasoning from a number that should not have been accepted without a check.
 
 - Expected binding constraint: `none set`
 - Acceptable top recommendations: none set, see the note above
-- Required flags: `implausible_input`
+- Required flags: `implausible_input`, `asks_clarifying_question`
 
-- This system: constraint `species_richness`, top pick `legume_cover_crop`, 11.0 variables per recommendation, grounding 79%, 7 quantified claims, 100% with an interval, flags 0%, 0.3s
+- This system: constraint `species_richness`, top pick `legume_cover_crop`, 11.0 variables per recommendation, grounding 79%, 7 quantified claims, 100% with an interval, flags 100%, 3.9s
+- It asked a clarifying question first: A soil organic carbon of 2.5% under 180mm annual rainfall is unusual, since carbon accrual at that level normally requires more biomass production than that rainfall supports. Is the site irrigated, does it waterlog seasonally, or has it had heavy organic amendment? Or was that figure from a different depth or a different plot?
 - Baseline: constraint `not stated in a recognised form`, top pick `residue_retention`, 5.8 variables per recommendation, grounding 0%, 20 quantified claims, 25% with an interval, flags 0%, 1 unverifiable citations, 7.2s

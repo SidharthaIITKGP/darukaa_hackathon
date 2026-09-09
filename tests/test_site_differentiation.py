@@ -18,6 +18,7 @@ import pytest
 from src.demo import DEMO_SITES
 from src.graph.edges import build_graph
 from src.graph.propagate import (
+    PRIORITY_TOLERANCE,
     TIER_1_MIN_EFFECT,
     _CONFIDENCE_FACTOR,
     limiting_factor,
@@ -233,23 +234,64 @@ def test_tier_2_can_outscore_tier_1(graph: nx.MultiDiGraph) -> None:
     assert ranked.index(worst_tier_1) < ranked.index(best_tier_2)
 
 
-def test_tier_1_is_ordered_by_constraint_movement(graph: nx.MultiDiGraph) -> None:
-    """Within tier 1 the question is what most relieves the constraint, not
-    what is best overall, so ordering follows the movement on the constraint
-    discounted by evidence quality. Ordering by the multi-objective score put
-    vetiver grass strips, scoring 0.0 because erosion carries no score weight,
-    above interventions that do more for erosion."""
-    ranked = rank_interventions(graph, DEMO_SITES["western_ghats"], n=4000, seed=0)
-    tier_1 = [r for r in ranked if r.tier == 1]
-    assert len(tier_1) >= 2, [r.intervention for r in tier_1]
+def _priorities(ranked, limiting_var: str) -> list[float]:
+    return [
+        abs(r.constraint_movement) * _CONFIDENCE_FACTOR[r.effects[limiting_var].evidence_quality]
+        for r in ranked
+        if r.tier == 1
+    ]
 
-    priorities = [
-        abs(r.constraint_movement) * _CONFIDENCE_FACTOR[r.effects["erosion_rate"].evidence_quality]
-        for r in tier_1
-    ]
-    assert priorities == sorted(priorities, reverse=True), [
-        (r.intervention, r.constraint_movement) for r in tier_1
-    ]
+
+def test_tier_1_never_inverts_beyond_tolerance(graph: nx.MultiDiGraph) -> None:
+    """The guarantee the tier 1 ordering actually makes: substantially better
+    constraint relief wins outright. Within PRIORITY_TOLERANCE the score
+    decides, so priorities are not strictly descending, but no intervention
+    may rank above another whose relief is better by more than the tolerance.
+
+    Ordering tier 1 by the multi-objective score instead put vetiver grass
+    strips, scoring 0.0 because erosion carries no score weight, above
+    interventions doing four times as much for erosion.
+    """
+    for site_id, site in DEMO_SITES.items():
+        limiting_var = limiting_factor(site)[0]
+        ranked = rank_interventions(graph, site, n=4000, seed=0)
+        priorities = _priorities(ranked, limiting_var)
+
+        for i, higher in enumerate(priorities):
+            for lower in priorities[i + 1 :]:
+                if lower <= higher:
+                    continue
+                # A lower-ranked entry with better relief is only allowed
+                # when the two are comparable.
+                assert (lower - higher) / lower <= PRIORITY_TOLERANCE + 1e-9, (
+                    f"{site_id}: an intervention with priority {lower:.4f} ranks below one "
+                    f"with {higher:.4f}, an inversion beyond the tolerance"
+                )
+
+
+def test_tolerance_band_lets_evidence_break_comparable_relief(graph: nx.MultiDiGraph) -> None:
+    """On the deccan site legume cover crop and reduced tillage relieve water
+    comparably (about 3.1% against 3.4%, inside the tolerance), and legume has
+    a materially higher multi-objective score and two converging meta-analyses
+    behind it. Without the band, 0.28pp of water movement decided this, which
+    is inside the Monte Carlo noise."""
+    ranked = rank_interventions(graph, DEMO_SITES["deccan_semiarid"], n=4000, seed=0)
+    order = [r.intervention for r in ranked]
+
+    legume = next(r for r in ranked if r.intervention == "legume_cover_crop")
+    tillage = next(r for r in ranked if r.intervention == "reduced_tillage")
+    assert legume.tier == 1 and tillage.tier == 1
+    assert legume.score > tillage.score
+    assert order.index("legume_cover_crop") < order.index("reduced_tillage")
+
+
+def test_substantially_better_relief_still_wins_outright(graph: nx.MultiDiGraph) -> None:
+    """The band must not swallow a real difference. Contour bunding relieves
+    water more than twice as well as anything else on the deccan site, so it
+    heads the list however good the alternatives' co-benefits are."""
+    ranked = rank_interventions(graph, DEMO_SITES["deccan_semiarid"], n=4000, seed=0)
+    assert ranked[0].intervention == "contour_bunding"
+    assert any(r.score > ranked[0].score for r in ranked[1:])
 
 
 def test_vetiver_not_above_a_larger_erosion_movement(graph: nx.MultiDiGraph) -> None:
@@ -262,8 +304,14 @@ def test_vetiver_not_above_a_larger_erosion_movement(graph: nx.MultiDiGraph) -> 
         pytest.skip("vetiver_grass_strips is not in tier 1 on this site")
 
     vetiver_position = tier_1.index(vetiver)
+    vetiver_movement = abs(vetiver.constraint_movement)
     for other in tier_1[vetiver_position + 1 :]:
-        assert abs(other.constraint_movement) <= abs(vetiver.constraint_movement), (
+        other_movement = abs(other.constraint_movement)
+        if other_movement <= vetiver_movement:
+            continue
+        # Ranking below vetiver on better movement is only allowed inside the
+        # tolerance band, where the score decides.
+        assert (other_movement - vetiver_movement) / other_movement <= PRIORITY_TOLERANCE + 1e-9, (
             f"{other.intervention} moves erosion by {other.constraint_movement:+.1%} and ranks "
             f"below vetiver at {vetiver.constraint_movement:+.1%}"
         )

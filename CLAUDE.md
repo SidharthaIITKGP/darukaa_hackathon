@@ -83,8 +83,22 @@ data/
   structured/takola_2023/ CSVs — 298 effect sizes. Parsed to edges, NOT embedded.
   rasters/gsocseq/        Optional GeoTIFFs — point lookups at runtime.
   cache/                  Prefetched API responses. Committed.
-  derived/                Generated. Gitignored. Rebuildable.
+  derived/                Generated and rebuildable, but see below.
 ```
+
+Everything in `derived/` can be regenerated from the corpus, so nothing there
+is a source of truth. Three artifacts are nevertheless committed on purpose:
+
+- `chunks.jsonl` and `tables.jsonl` — so the system runs without the source
+  PDFs, which are gitignored (87MB, and redistributing them is a licensing
+  grey area).
+- `causal_graph.json` — the single most inspectable artifact in the project.
+  A reviewer should be able to read the nodes, edges, effect distributions and
+  evidence refs without running anything first.
+
+Rebuild it with `python -m src.graph.edges`, which validates every
+`source_id` against `sources.yaml` before writing. Large indices
+(`derived/qdrant/`, `*.faiss`) stay gitignored.
 
 `ingest_manifest.yaml` defines which page ranges of each PDF to ingest —
 1171 raw pages reduced to 528. Honour it; do not ingest whole PDFs.

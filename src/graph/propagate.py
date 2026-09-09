@@ -168,6 +168,20 @@ CONSTRAINT_DIRECTION: dict[str, float] = {
 # into tier 1 would promote it above interventions that genuinely help.
 TIER_1_MIN_EFFECT = 0.01
 
+# How close two tier 1 constraint-relief priorities have to be before they
+# count as comparable, as a fraction of the higher one. A modelling
+# assumption, and specifically an admission about precision: these p50s come
+# from a 4000-sample Monte Carlo, so a gap of a fraction of a percentage
+# point is sampling noise rather than a real difference in how much an
+# intervention relieves the constraint. Treating such a gap as decisive was
+# false precision that let a mechanistic-only intervention outrank one with
+# two converging meta-analyses behind it on 0.28pp of water movement.
+#
+# Within a tolerance group the multi-objective score decides, so evidence
+# quality and co-benefits break comparable relief. Outside it, substantially
+# better relief still wins outright.
+PRIORITY_TOLERANCE = 0.10
+
 
 def _source_scopes() -> dict[str, str]:
     data = yaml.safe_load(_SOURCES_YAML_PATH.read_text())
@@ -912,6 +926,42 @@ def _constraint_priority(ranked: RankedIntervention, limiting_var: str) -> float
     return abs(ranked.constraint_movement) * _CONFIDENCE_FACTOR[result.evidence_quality]
 
 
+def _order_tier_1(
+    entries: list[RankedIntervention], limiting_var: str
+) -> list[RankedIntervention]:
+    """Order tier 1 by constraint relief, with comparable relief decided on
+    the multi-objective score.
+
+    Entries are grouped by priority: each group starts with the highest
+    remaining entry as its leader and absorbs every following entry within
+    PRIORITY_TOLERANCE of that leader. Groups stay in priority order, and
+    within a group the score decides, so substantially better relief wins
+    outright while comparable relief is settled by evidence quality and
+    co-benefits.
+
+    Grouping is greedy from the leader rather than transitive between
+    neighbours, so a long chain of small steps cannot merge into one group
+    whose ends differ by far more than the tolerance.
+    """
+    remaining = sorted(entries, key=lambda r: -_constraint_priority(r, limiting_var))
+
+    ordered: list[RankedIntervention] = []
+    group: list[RankedIntervention] = []
+    leader_priority = 0.0
+
+    for entry in remaining:
+        priority = _constraint_priority(entry, limiting_var)
+        if group and priority >= leader_priority * (1.0 - PRIORITY_TOLERANCE):
+            group.append(entry)
+            continue
+        ordered.extend(sorted(group, key=lambda r: -r.score))
+        group = [entry]
+        leader_priority = priority
+
+    ordered.extend(sorted(group, key=lambda r: -r.score))
+    return ordered
+
+
 def _sequencing_note(intervention: str, negative_targets: set[str], limiting_var: str, why: str) -> str:
     targets = ", ".join(sorted(negative_targets))
     return (
@@ -1050,21 +1100,21 @@ def rank_interventions(
     # "what most relieves the constraint", since by Liebig's law nothing else
     # can be realised until it lifts. So tier 1 is ordered by how far it
     # moves the constraint, discounted by evidence_quality on the same axis
-    # used everywhere else, and the multi-objective score only breaks ties:
-    # co-benefits decide between two interventions that relieve the
-    # constraint comparably, and never outweigh relieving it. Ordering tier 1
-    # by the multi-objective score instead put an intervention scoring 0.0 --
-    # because the constraint carries no score weight -- above better ones,
-    # which defeated the gate from inside.
+    # used everywhere else, with the multi-objective score deciding between
+    # interventions whose relief is comparable (see _order_tier_1 and
+    # PRIORITY_TOLERANCE). Co-benefits never outweigh substantially better
+    # relief. Ordering tier 1 by the multi-objective score instead put an
+    # intervention scoring 0.0 -- because the constraint carries no score
+    # weight -- above better ones, which defeated the gate from inside.
     #
     # Tier 2 ordering is by score alone. Its members do not move the
-    # constraint by definition, so _constraint_priority returns 0.0 for all
-    # of them and the key collapses to the score.
+    # constraint by definition, so no grouping applies.
     #
     # When no intervention in the graph can address the constraint, tier 1 is
     # empty and this degrades to the plain score ranking. That case is left
     # visible rather than patched: every returned item carries tier 2, which
     # is what callers check to report the fallback instead of presenting a
     # list that silently ignores the diagnosis.
-    ranked.sort(key=lambda r: (r.tier, -_constraint_priority(r, limiting_var), -r.score))
-    return ranked
+    tier_1 = _order_tier_1([r for r in ranked if r.tier == 1], limiting_var)
+    tier_2 = sorted((r for r in ranked if r.tier == 2), key=lambda r: -r.score)
+    return tier_1 + tier_2

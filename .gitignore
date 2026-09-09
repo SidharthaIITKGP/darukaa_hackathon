@@ -24,3 +24,4 @@ data/derived/qdrant/.lock
 # Conversation memory written by the agent graph at runtime. Rebuilt by
 # talking to it, and a demo run should not commit its own scratch state.
 data/derived/sites/
+CLAUDE.mdCLAUDE.md

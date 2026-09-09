@@ -59,7 +59,7 @@ from src.graph.schemas import (
     implausible_combinations,
 )
 from src.retrieval.bind import bind_evidence
-from src.retrieval.search import RERANK_FLOOR, RetrievedChunk, has_support, search
+from src.retrieval.search import RERANK_FLOOR, RetrievedChunk, has_support, low_memory, search
 
 _ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = _ROOT / "data" / "cache"
@@ -1307,10 +1307,16 @@ def _evidence_lines(state: ConversationState) -> list[str]:
     if not evidence:
         return []
     lines = ["RETRIEVED EVIDENCE"]
+    ordering = (
+        "fused by reciprocal rank over a dense retriever and BM25, with no cross-encoder "
+        "on this deployment"
+        if low_memory()
+        else "reranked by a cross-encoder"
+    )
     lines.append(
-        "Passages retrieved for the edges behind the explanations above, reranked by a "
-        "cross-encoder. A passage marked supporting only was found outside the sources "
-        "the edge cites: it may inform, but it is not that edge's citation."
+        f"Passages retrieved for the edges behind the explanations above, {ordering}. A "
+        "passage marked supporting only was found outside the sources the edge cites: it "
+        "may inform, but it is not that edge's citation."
     )
     for key, chunks in evidence.items():
         source, target = key.split("->")
@@ -1318,12 +1324,19 @@ def _evidence_lines(state: ConversationState) -> list[str]:
         lines.append(f"  {render.label(source)} -> {render.label(target)}:")
         if not supported:
             lines.append(
-                "    No passage cleared the support floor. Nothing is quoted here, and the "
+                "    No passage cleared the support test. Nothing is quoted here, and the "
                 "relationship rests on its registered citation alone."
             )
             continue
         for chunk in chunks:
-            if chunk.rerank_score is None or chunk.rerank_score < RERANK_FLOOR:
+            # Without a cross-encoder there is no score to threshold on, so
+            # the retriever agreement that has_support already accepted is
+            # what selects a passage. Filtering on a missing score here would
+            # quote nothing at all on a low memory deployment.
+            if low_memory():
+                if chunk.dense_rank is None or chunk.bm25_rank is None:
+                    continue
+            elif chunk.rerank_score is None or chunk.rerank_score < RERANK_FLOOR:
                 continue
             body = _collapse_whitespace(chunk.body)
             excerpt = body[:280] + ("..." if len(body) > 280 else "")
@@ -1334,7 +1347,12 @@ def _evidence_lines(state: ConversationState) -> list[str]:
                 marks.append("out of scope")
             mark = f" [{', '.join(marks)}]" if marks else ""
             lines.append(f"    - {chunk.citation} p{chunk.pages}{mark}")
-            lines.append(f"      score {chunk.rerank_score:.2f}: {excerpt}")
+            score = (
+                f"score {chunk.rerank_score:.2f}"
+                if chunk.rerank_score is not None
+                else "both retrievers"
+            )
+            lines.append(f"      {score}: {excerpt}")
             if chunk.scope_note:
                 lines.append(f"      scope: {chunk.scope_note}")
     lines.append("")
@@ -1810,11 +1828,16 @@ def check_entailment(claim: Claim, chunks: list[RetrievedChunk]) -> Verdict:
     if not chunks:
         return Verdict(verdict="unsupported", reason="Retrieval returned nothing for this claim.")
     if not has_support(chunks):
+        basis = (
+            "was returned by both retrievers"
+            if low_memory()
+            else "cleared the cross-encoder support floor"
+        )
         return Verdict(
             verdict="unsupported",
             reason=(
-                "No retrieved passage cleared the cross-encoder support floor, so the corpus "
-                "loaded here does not discuss this relationship."
+                f"No retrieved passage {basis}, so the corpus loaded here does not discuss "
+                "this relationship."
             ),
         )
 
@@ -1823,13 +1846,25 @@ def check_entailment(claim: Claim, chunks: list[RetrievedChunk]) -> Verdict:
     )
     payload = llm_json(_ENTAILMENT_SYSTEM, f"CLAIM: {claim.text}\n\nPASSAGES:\n{passages}")
     if payload is None:
-        best = max(c.rerank_score for c in chunks if c.rerank_score is not None)
+        # In low memory mode no cross-encoder ran, so there is no score to
+        # quote and support rests on retriever agreement instead. Reported as
+        # what it is rather than dressed up as a score, and never inferred as
+        # a number, which would be a figure from nowhere.
+        scores = [c.rerank_score for c in chunks if c.rerank_score is not None]
+        if scores:
+            evidence = f"Best retrieved passage scores {max(scores):.2f}, above the support floor."
+        else:
+            evidence = (
+                "The supporting passage was returned by both the dense retriever and BM25, "
+                "which is retriever agreement rather than a relevance score; no cross-encoder "
+                "ran on this deployment."
+            )
         return Verdict(
             verdict="supported",
             reason=(
-                f"Best retrieved passage scores {best:.2f}, above the support floor. No "
-                f"entailment model is configured ({model_name()} unavailable), so this rests "
-                f"on retrieval alone and is not a judgement that the passage entails the claim."
+                f"{evidence} No entailment model is configured ({model_name()} unavailable), "
+                f"so this rests on retrieval alone and is not a judgement that the passage "
+                f"entails the claim."
             ),
         )
     verdict = payload.get("verdict")

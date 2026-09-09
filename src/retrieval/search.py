@@ -26,6 +26,7 @@ accuracy with latency without imposing it on the conversation.
 from __future__ import annotations
 
 import atexit
+import os
 import pickle
 import time
 from functools import lru_cache
@@ -71,6 +72,21 @@ RRF_K = 60
 # threshold on an uncalibrated model output, not a probability, and it is a
 # modelling assumption in exactly the sense the methodology section means.
 RERANK_FLOOR = 0.30
+
+# Environment switch for deployment targets that cannot hold a cross-encoder
+# in memory. Streamlit Community Cloud gives about 1GB, and the smaller of
+# the two rerankers is still a 278M-parameter forward pass per candidate on
+# top of the embedding model and both indexes. With this set, no
+# cross-encoder is loaded at all and the fused RRF order is the final order.
+#
+# Read on every call rather than captured at import, so a host can set it
+# before the first query without controlling import order.
+LOW_MEMORY_ENV = "DARUKAA_LOW_MEMORY"
+
+
+def low_memory() -> bool:
+    """True when cross-encoder reranking is disabled by the environment."""
+    return os.environ.get(LOW_MEMORY_ENV, "").strip().lower() in ("1", "true", "yes")
 
 # Query results cached per process. Conversational flows re-ask the same
 # question as site state fills in, and an edge's bound evidence is requested
@@ -401,7 +417,7 @@ def _search_uncached(
     rrf_ms = (time.perf_counter() - rrf_start) * 1000
 
     rerank_start = time.perf_counter()
-    if rerank and results:
+    if rerank and results and not low_memory():
         head = results[:RERANK_DEPTH]
         tail = results[RERANK_DEPTH:]
         # A cross-encoder feeds query and document through one transformer,
@@ -450,7 +466,18 @@ def has_support(chunks: list[RetrievedChunk]) -> bool:
     Only meaningful on reranked results. Chunks with no rerank_score have not
     been scored against the query by anything that could answer this, so they
     count as no support.
+
+    Under LOW_MEMORY_ENV there is no cross-encoder to ask, so the question is
+    answered by retriever agreement instead: a chunk that both the dense
+    retriever and BM25 put in their candidate pools was found on two
+    independent signals, which is the same reasoning fusion already rests on.
+    It is a weaker test than a cross-encoder score and it is not the same
+    quantity, so it is deliberately not written into rerank_score, where it
+    would be read as one. Callers that report grounding should say which rule
+    produced it.
     """
+    if low_memory():
+        return any(c.dense_rank is not None and c.bm25_rank is not None for c in chunks)
     return any(c.rerank_score is not None and c.rerank_score >= RERANK_FLOOR for c in chunks)
 
 
@@ -464,7 +491,8 @@ def warmup(precise: bool = False) -> None:
     _qdrant()
     _bm25()
     embedding_model()
-    _reranker(precise)
+    if not low_memory():
+        _reranker(precise)
     _search_uncached("soil organic carbon", 3, None, None, None, True, precise)
 
 

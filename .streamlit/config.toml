@@ -1,0 +1,26 @@
+# Deliberately plain. The brief asks for reasoning that can be inspected, not
+# a designed interface, so this sets only what deployment needs and leaves
+# the rest at Streamlit's defaults.
+
+[server]
+headless = true
+# CORS and XSRF protection are left at their secure defaults. Nothing here
+# accepts a file upload, and the corpus passages shown under a recommendation
+# are text, so the default message limits are untouched too.
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#2f6f4e"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f2f2ef"
+textColor = "#1a1a1a"
+font = "sans serif"
+
+[client]
+# A traceback in the browser is not a useful answer to a landholder. The app
+# catches the failures it can name and reports them in words.
+showErrorDetails = false
+toolbarMode = "minimal"

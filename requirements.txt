@@ -1,0 +1,36 @@
+# Pinned to what the working venv runs, so a deployed build resolves the same
+# versions rather than whatever is newest on the day it is built.
+#
+# The CPU wheel index comes first and is not optional. torch resolves to the
+# CUDA build by default, which pulls several gigabytes of nvidia-* wheels that
+# no Streamlit Community Cloud container can install inside its disk or time
+# budget, and that nothing here would use: there is no GPU on that host and
+# both the embedding model and the reranker run on CPU.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Interface
+streamlit==1.63.0
+
+# Agent state machine
+langgraph==1.2.11
+langchain-core==1.6.2
+litellm==1.100.0
+
+# Retrieval: dense index, lexical index, embedding and reranker models
+qdrant-client==1.19.0
+rank-bm25==0.2.2
+sentence-transformers==6.0.1
+transformers==5.16.1
+torch==2.14.0
+huggingface-hub==1.30.0
+
+# Causal graph and propagation
+networkx==3.6.1
+numpy==2.5.3
+scipy==1.18.1
+
+# Data contracts, config, IO
+pydantic==2.13.5
+pyyaml==6.0.3
+python-dotenv==1.2.3
+requests==2.34.2

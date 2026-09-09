@@ -12,10 +12,14 @@ data/corpus/**/*.pdf
 # Large rasters
 data/rasters/*.tif
 
-# Rebuildable, but chunks are committed so the system runs without the PDFs
-data/derived/qdrant/
+# Rebuildable, but committed on purpose: a deployed build has no PDFs and no
+# GPU, and rebuilding the dense index on first run means embedding 4.2MB of
+# chunks before the first query can be answered. The two indexes together are
+# under 7MB, which is cheaper to carry than to regenerate.
 data/derived/*.faiss
-data/derived/bm25.pkl
+# Qdrant's own runtime lock file, written when the storage directory is
+# opened. The index next to it is committed; this is not part of it.
+data/derived/qdrant/.lock
 
 # Conversation memory written by the agent graph at runtime. Rebuilt by
 # talking to it, and a demo run should not commit its own scratch state.

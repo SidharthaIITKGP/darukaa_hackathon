@@ -34,6 +34,7 @@ from src.graph.propagate import (
     rank_interventions,
 )
 from src.graph.schemas import Confidence, Measurement, Provenance, SiteState
+from src.retrieval.search import RERANK_FLOOR
 
 _SOURCES_YAML_PATH = Path(__file__).resolve().parents[1] / "sources.yaml"
 
@@ -555,6 +556,14 @@ def _methodology_lines() -> list[str]:
         "    these figures come from a Monte Carlo sample, so a gap of a fraction of",
         "    a percentage point is sampling noise, and treating it as decisive would",
         "    be false precision. Substantially better relief still wins outright.",
+        f"  RERANK_FLOOR                      {RERANK_FLOOR:g}",
+        "    Cross-encoder score below which a retrieved passage counts as no",
+        "    support rather than weak support. Retrieval always returns results, so",
+        "    without a floor a question the corpus does not answer looks identical to",
+        "    one it does. Read off the observed score distribution on this corpus,",
+        "    where a passage that answers the query scores near 0.99 and the best",
+        "    available match for an uncovered topic scores under 0.2. It is a",
+        "    threshold on an uncalibrated model output, not a probability.",
         "",
         "Effect sizes are sampled as distributions, composed multiplicatively along a",
         "causal chain, and combined across distinct mechanisms feeding one variable",

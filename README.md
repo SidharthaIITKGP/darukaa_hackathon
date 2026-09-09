@@ -6,7 +6,7 @@ levels, and citations to published evidence.
 
 Built for the Darukaa.Earth hackathon challenge.
 
-**Live app:** _[fill in]_
+**Live app:** https://darukaahackathon-s.streamlit.app/
 **Repository:** https://github.com/SidharthaIITKGP/darukaa_hackathon
 
 ---

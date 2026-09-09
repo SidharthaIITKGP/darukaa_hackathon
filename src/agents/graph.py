@@ -21,7 +21,9 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from pathlib import Path
 
+from dotenv import load_dotenv
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import END, StateGraph
@@ -55,6 +57,19 @@ from src.retrieval.search import RetrievedChunk, warmup
 # full diagnose-to-critic chain, and two critic revisions, without the
 # default limit cutting a legitimate conversation short.
 RECURSION_LIMIT = 80
+
+ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+
+
+def load_env() -> None:
+    """Read provider credentials from .env into the environment.
+
+    Called from main rather than at import, so importing the graph does not
+    change the process environment underneath a caller that configured its
+    own. Existing variables win. .env is gitignored, and no value read from
+    it is logged or printed.
+    """
+    load_dotenv(ENV_PATH, override=False)
 
 # The state carries our own Pydantic models, so the checkpointer is told
 # exactly which types it may reconstruct rather than left permissive. The
@@ -261,6 +276,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--demo", action="store_true", help="replay the scripted conversation")
     parser.add_argument("--thread-id", default="demo")
     args = parser.parse_args(argv)
+    load_env()
 
     if not args.demo:
         parser.print_help()

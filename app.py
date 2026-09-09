@@ -206,14 +206,41 @@ def retrieval_status() -> tuple[bool, str | None]:
     return True, None
 
 
+def reset_session(site_id: str | None = None) -> None:
+    """Start a genuinely new conversation, discarding everything accumulated.
+
+    Clearing the chat history alone is not a reset. The site is what the
+    conversation accumulates: SiteState, the site_history behind belief
+    revision, and the asked_about list that stops a question being repeated
+    all live in the LangGraph checkpointer under thread_id, and the SiteState
+    a new Conversation starts from is chosen by site_id. Leaving either in
+    place means the next message is answered against the previous site, which
+    is why "biodiversity is declining on my land" returned a full diagnosis
+    instead of a clarifying question after a preset had been loaded.
+
+    A new thread_id abandons the checkpointed state wholesale, which is what
+    clears site_history and asked_about. A new site_id both selects a blank
+    SiteState and keeps the persistent profile written under the old id from
+    being written over by an unrelated conversation.
+
+    site_id is given when a preset is being loaded, and generated otherwise.
+    """
+    st.session_state["site_id"] = site_id or f"app_{uuid.uuid4().hex[:8]}"
+    st.session_state["thread_id"] = f"{st.session_state['site_id']}-{uuid.uuid4().hex[:8]}"
+    st.session_state["history"] = []
+    st.session_state.pop("conversation", None)
+
+
 def new_conversation() -> Conversation:
     """One conversation thread for this browser session."""
     site_id = st.session_state.get("site_id", "app_site")
-    return Conversation(
-        DEMO_SITES.get(site_id) or _blank_site(site_id),
-        thread_id=st.session_state["thread_id"],
-        app=agent_app(),
-    )
+    preset = DEMO_SITES.get(site_id)
+    # Copied, not handed over. DEMO_SITES is module level and a Conversation
+    # mutates the SiteState it is given as intake fills fields in, so passing
+    # the original would let one session's answers leak into the next
+    # session that loads the same preset.
+    site = preset.model_copy(deep=True) if preset is not None else _blank_site(site_id)
+    return Conversation(site, thread_id=st.session_state["thread_id"], app=agent_app())
 
 
 def _blank_site(site_id: str):
@@ -282,6 +309,20 @@ def recommendation_blocks(state: dict) -> list[dict]:
             }
         )
     return blocks
+
+
+def draw_text(text: str, monospace: bool = False) -> None:
+    """Render one message.
+
+    st.write treats its input as markdown, which collapses the single line
+    breaks and column alignment a rendered report depends on. Reports
+    therefore go to st.text, which preserves both. Prose still goes through
+    markdown, where wrapping is what you want.
+    """
+    if monospace:
+        st.text(text)
+    else:
+        st.write(text)
 
 
 def draw_recommendation(block: dict) -> None:
@@ -368,16 +409,13 @@ def draw_sidebar() -> str | None:
         )
         for site_id, (label, prompt) in PRESET_PROMPTS.items():
             if st.button(label, key=f"preset_{site_id}", use_container_width=True):
-                st.session_state["site_id"] = site_id
-                st.session_state["thread_id"] = f"{site_id}-{uuid.uuid4().hex[:8]}"
-                st.session_state["history"] = []
-                st.session_state.pop("conversation", None)
+                reset_session(site_id)
                 clicked = prompt
 
         if st.button("Reset conversation", use_container_width=True):
-            st.session_state["thread_id"] = uuid.uuid4().hex[:12]
-            st.session_state["history"] = []
-            st.session_state.pop("conversation", None)
+            # No site_id, so the next conversation starts from a blank
+            # SiteState rather than from whichever preset was last loaded.
+            reset_session()
             st.rerun()
 
         st.divider()
@@ -440,9 +478,8 @@ def main() -> None:
         "a real study."
     )
 
-    st.session_state.setdefault("thread_id", uuid.uuid4().hex[:12])
-    st.session_state.setdefault("history", [])
-    st.session_state.setdefault("site_id", "app_site")
+    if "thread_id" not in st.session_state:
+        reset_session()
 
     preset = draw_sidebar()
 
@@ -454,7 +491,7 @@ def main() -> None:
     for entry in st.session_state["history"]:
         with st.chat_message(entry["role"]):
             if entry.get("text"):
-                st.write(entry["text"])
+                draw_text(entry["text"], monospace=entry.get("monospace", False))
             for block in entry.get("blocks", []):
                 draw_recommendation(block)
             if entry.get("grounding"):
@@ -500,7 +537,11 @@ def main() -> None:
         if coverage is not None:
             grounding = coverage_report(state.get("claims") or [], coverage)
 
-        st.write(draft)
+        # A report is laid out with aligned columns and hard line breaks, so
+        # it needs a surface that preserves whitespace. A greeting or a
+        # clarifying question is prose and reads better wrapped.
+        is_report = bool(blocks)
+        draw_text(draft, monospace=is_report)
         for block in blocks:
             draw_recommendation(block)
         if grounding:
@@ -511,6 +552,7 @@ def main() -> None:
             {
                 "role": "assistant",
                 "text": draft,
+                "monospace": is_report,
                 "blocks": blocks,
                 "grounding": grounding,
             }

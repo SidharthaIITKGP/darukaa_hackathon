@@ -999,6 +999,118 @@ EDGES.append(
     )
 )
 
+# The three edges below carry vetiver beyond erosion control. A live contour
+# hedge is not only a sediment barrier: it changes infiltration, soil
+# structure and field vegetation structure as well, and an intervention
+# represented by its erosion edge alone gets justified on one variable, which
+# is below the brief's floor of three. All three are mechanistic own
+# estimates. No meta-analysis in this corpus gives a pooled effect size for
+# vetiver on any of them, so the direction is what these assert and the
+# interval is deliberately weak. Each is gated on the same slope band as the
+# erosion edge, because all three mechanisms run on intercepted overland
+# flow, which is what a slope produces.
+
+EDGES.append(
+    CausalEdge(
+        source="vetiver_grass_strips",
+        target="infiltration_rate",
+        sign="+",
+        metric=EffectMetric.PERCENT_CHANGE,
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
+        lag_years=(0, 2),
+        strength=EvidenceStrength.MECHANISTIC,
+        confidence=Confidence.LOW,
+        evidence=[
+            EvidenceRef(
+                source_id="FAO_2017_VGSSM",
+                role="primary",
+                note=(
+                    "Supports direction only (vegetative barriers slow runoff and increase "
+                    "infiltration opportunity time). The interval is an own estimate, not a "
+                    "published figure."
+                ),
+            )
+        ],
+        conditions=Conditions(slope_pct=(3, 40)),
+        mechanism=(
+            "A stiff grass hedge along the contour slows overland flow and ponds it "
+            "shallowly on the upslope side, so water spends longer in contact with the "
+            "surface and a larger share of it enters the profile instead of leaving the "
+            "field. Gated on slope 3-40%, the same band as the erosion edge: the mechanism "
+            "is interception of overland flow, and below 3% there is little of it to "
+            "intercept. Own judgement, not a published threshold."
+        ),
+    )
+)
+
+EDGES.append(
+    CausalEdge(
+        source="vetiver_grass_strips",
+        target="aggregate_stability",
+        sign="+",
+        metric=EffectMetric.PERCENT_CHANGE,
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
+        lag_years=(1, 4),
+        strength=EvidenceStrength.MECHANISTIC,
+        confidence=Confidence.LOW,
+        evidence=[
+            EvidenceRef(
+                source_id="FAO_2017_VGSSM",
+                role="primary",
+                note=(
+                    "Supports direction only (dense perennial root systems bind soil and "
+                    "vegetative barriers retain fines on the field). The interval is an own "
+                    "estimate, not a published figure."
+                ),
+            )
+        ],
+        conditions=Conditions(slope_pct=(3, 40)),
+        mechanism=(
+            "Dense perennial vetiver roots bind soil particles and exude organic compounds "
+            "that hold aggregates together, while the hedge traps the fine, carbon-rich "
+            "particles that runoff would otherwise carry away first. Keeping those fines on "
+            "the field leaves the material aggregates are built from where it can be "
+            "rebuilt. Slower than the erosion effect at 1-4 years, because it depends on "
+            "root establishment rather than on the barrier standing up. Gated on slope "
+            "3-40%. Own judgement, not a published threshold."
+        ),
+    )
+)
+
+EDGES.append(
+    CausalEdge(
+        source="vetiver_grass_strips",
+        target="structural_heterogeneity",
+        sign="+",
+        metric=EffectMetric.PERCENT_CHANGE,
+        effect=Distribution(family="lognormal", ci_low=0.01, ci_high=0.08),
+        lag_years=(1, 4),
+        strength=EvidenceStrength.MECHANISTIC,
+        confidence=Confidence.LOW,
+        evidence=[
+            EvidenceRef(
+                source_id="IPBES_2018_LDR",
+                role="primary",
+                note=(
+                    "Supports direction only (permanent vegetation strips add structural "
+                    "variation to otherwise uniform cropland). The interval is an own "
+                    "estimate, not a published figure."
+                ),
+            )
+        ],
+        conditions=Conditions(slope_pct=(3, 40)),
+        mechanism=(
+            "Permanent grass strips introduce undisturbed, structurally distinct vegetation "
+            "into a field that is otherwise uniform and tilled on one cycle, adding "
+            "within-field variation in vegetation height and density and cover that "
+            "persists across the fallow. Smaller in effect than a woody hedgerow, which "
+            "adds a vertical layer a grass strip does not. Gated on slope 3-40%, since the "
+            "strips are sited where contour barriers are worth installing. Own judgement, "
+            "not a published threshold."
+        ),
+    )
+)
+
 EDGES.append(
     CausalEdge(
         source="intercropping",

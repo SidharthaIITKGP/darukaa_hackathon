@@ -379,3 +379,46 @@ def test_ph_differentiates_the_microbial_route(graph: nx.MultiDiGraph) -> None:
     ).effects["crop_yield"]
 
     assert in_band_yield.p50 > alkaline_yield.p50 * 2
+
+
+def test_vetiver_justification_clears_the_three_variable_floor(graph: nx.MultiDiGraph) -> None:
+    """Regression: vetiver used to be justified by erosion_rate alone.
+
+    With only the erosion edge, vetiver reached exactly one variable, which
+    is below the brief's floor of three and was masked by an xfail on the
+    eval harness. The three mechanistic edges added alongside it (to
+    infiltration_rate, aggregate_stability and structural_heterogeneity) are
+    what carry it past the floor, and they do so by cascading rather than by
+    counting: infiltration reaches plant available water and then yield, and
+    structural heterogeneity reaches the pollinator route.
+    """
+    site = SiteState(
+        site_id="steep_humid_regression",
+        slope_pct=Measurement(
+            value=15, unit="%", provenance=Provenance.USER_STATED, confidence=Confidence.HIGH
+        ),
+        annual_rainfall_mm=Measurement(
+            value=2000, unit="mm", provenance=Provenance.USER_STATED, confidence=Confidence.HIGH
+        ),
+        soil_organic_carbon_pct=Measurement(
+            value=1.2, unit="%", provenance=Provenance.USER_STATED, confidence=Confidence.HIGH
+        ),
+    )
+    ranked = rank_interventions(graph, site)
+    vetiver = next((r for r in ranked if r.intervention == "vetiver_grass_strips"), None)
+    assert vetiver is not None, "vetiver should be ranked on a steep humid site"
+    assert vetiver.n_variables_touched >= 3, (
+        f"vetiver is justified by {vetiver.n_variables_touched} variables, "
+        f"below the brief's floor of three"
+    )
+
+
+def test_vetiver_reaches_each_edge_target_it_was_given(graph: nx.MultiDiGraph) -> None:
+    """The three added edges exist and point where they were meant to."""
+    targets = {target for _, target, _ in graph.out_edges("vetiver_grass_strips", keys=True)}
+    assert {
+        "erosion_rate",
+        "infiltration_rate",
+        "aggregate_stability",
+        "structural_heterogeneity",
+    } <= targets

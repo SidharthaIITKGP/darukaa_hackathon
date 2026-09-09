@@ -556,6 +556,31 @@ def observed_state_line(site: SiteState) -> str:
     return text
 
 
+# Divider drawn with box characters rather than "=". A line of "=" or "-"
+# directly under text is setext heading syntax in markdown, so the report
+# header rendered as a giant H1 once it reached a markdown surface. Box
+# drawing characters carry no markdown meaning and still read as a rule in a
+# terminal.
+_RULE = "\u2500" * 78
+
+# Site ids generated for a fresh browser session carry no meaning to anyone
+# reading the report, so they are not shown. A named site keeps its name.
+_ANONYMOUS_SITE_PREFIX = "app_"
+
+
+def site_label(site: SiteState) -> str:
+    """A site name fit to show a reader.
+
+    "app_2599744f" is a session key, not a place. Where the id is one of
+    those it is replaced outright; a named site gets its underscores turned
+    back into spaces.
+    """
+    site_id = site.site_id
+    if site_id.startswith(_ANONYMOUS_SITE_PREFIX) or not site_id.strip():
+        return "Your site"
+    return site_id.replace("_", " ")
+
+
 def render_diagnosis(
     site: SiteState,
     ranked: list[RankedIntervention],
@@ -563,11 +588,11 @@ def render_diagnosis(
     limiting_why: str,
 ) -> list[str]:
     lines: list[str] = []
-    lines.append("=" * 78)
-    lines.append(f"SITE: {site.site_id}")
+    lines.append(_RULE)
+    lines.append(site_label(site))
     if site.lat is not None and site.lon is not None:
         lines.append(f"Location: {site.lat}, {site.lon}")
-    lines.append("=" * 78)
+    lines.append(_RULE)
     lines.append("")
 
     lines.append("DIAGNOSIS")

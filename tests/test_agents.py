@@ -685,3 +685,64 @@ def test_graph_compiles_with_the_specified_topology():
         "critic",
     ):
         assert name in nodes_present
+
+
+# ========================= 9. greetings and meta =========================
+
+
+def test_a_greeting_gets_a_reply_and_no_analysis():
+    """A greeting must not cost a propagation run."""
+    conversation = Conversation(SiteState(site_id="app_greet1"), thread_id="greet1")
+    result = conversation.send("hi")
+
+    assert result.get("ranked") is None, "a greeting must not run the ranking"
+    assert conversation.question(result) is None, "a greeting is not a clarifying question"
+    draft = result.get("draft") or ""
+    assert draft, "a greeting must still get an answer"
+    assert "RECOMMENDATION" not in draft and "METHODOLOGY" not in draft
+    assert "soil organic carbon" in draft, "the reply should say what the system needs"
+
+
+def test_a_greeting_on_a_loaded_site_acknowledges_it_rather_than_re_analysing():
+    site = SiteState(
+        site_id="app_greet2",
+        soil_organic_carbon_pct=Measurement(
+            value=0.4, unit="%", provenance=Provenance.USER_STATED, confidence=Confidence.HIGH
+        ),
+    )
+    conversation = Conversation(site, thread_id="greet2")
+    result = conversation.send("hello")
+
+    assert result.get("ranked") is None
+    draft = result.get("draft") or ""
+    assert "soil organic carbon" in draft, "the reply should name what is already on file"
+    assert "RECOMMENDATION" not in draft
+
+
+def test_a_greeting_carrying_a_measurement_is_treated_as_data():
+    """The gate is what was parsed, not what the sentence opens with."""
+    conversation = Conversation(SiteState(site_id="app_greet3"), thread_id="greet3")
+    conversation.send("hi, soil organic carbon is 0.4% and rainfall is 340mm")
+    known = conversation.state()["site"].known()
+    assert "soil_organic_carbon_pct" in known and "annual_rainfall_mm" in known
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["hi", "Hello!", "thanks", "what can you do?", "how does this work", "help", "ok"],
+)
+def test_smalltalk_patterns_match(text):
+    assert nodes.is_smalltalk(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Biodiversity is declining on my land",
+        "soil organic carbon 0.35%, rainfall low, wheat monoculture",
+        "17.85, 75.42",
+        "rainfall is actually 340mm",
+    ],
+)
+def test_site_descriptions_are_not_smalltalk(text):
+    assert not nodes.is_smalltalk(text)

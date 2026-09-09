@@ -116,6 +116,10 @@ class ConversationState(TypedDict, total=False):
     critic_passes: int
     grounding_coverage: float | None
     pending_question: str | None
+    # A conversational reply owed for a greeting or meta question, set by
+    # intake and consumed by smalltalk_node. None on every turn that carries
+    # site data, which is what routes the turn to the full pipeline.
+    smalltalk_reply: str | None
     asked_about: Annotated[list[str], operator.add]
     site_history: Annotated[list[SiteState], operator.add]
 
@@ -169,6 +173,7 @@ def initial_state(site: SiteState) -> ConversationState:
         critic_passes=0,
         grounding_coverage=None,
         pending_question=None,
+        smalltalk_reply=None,
         asked_about=[],
         site_history=[],
         evidence={},

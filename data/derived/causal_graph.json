@@ -2418,6 +2418,153 @@
     },
     {
       "edge": {
+        "source": "vetiver_grass_strips",
+        "target": "infiltration_rate",
+        "sign": "+",
+        "effect": {
+          "family": "lognormal",
+          "ci_low": 0.01,
+          "ci_high": 0.08,
+          "ci_level": 0.95,
+          "point": null
+        },
+        "metric": "percent_change",
+        "lag_years": [
+          0.0,
+          2.0
+        ],
+        "conditions": {
+          "rainfall_mm": null,
+          "soc_pct": null,
+          "ph": null,
+          "clay_pct": null,
+          "slope_pct": [
+            3.0,
+            40.0
+          ],
+          "land_use": null,
+          "climate_zone": null
+        },
+        "evidence": [
+          {
+            "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
+            "pages": null,
+            "chunk_ids": null,
+            "quote": null,
+            "note": "Supports direction only (vegetative barriers slow runoff and increase infiltration opportunity time). The interval is an own estimate, not a published figure."
+          }
+        ],
+        "strength": "mechanistic",
+        "confidence": "low",
+        "mechanism": "A stiff grass hedge along the contour slows overland flow and ponds it shallowly on the upslope side, so water spends longer in contact with the surface and a larger share of it enters the profile instead of leaving the field. Gated on slope 3-40%, the same band as the erosion edge: the mechanism is interception of overland flow, and below 3% there is little of it to intercept. Own judgement, not a published threshold.",
+        "contested": false,
+        "contested_note": null
+      },
+      "source": "vetiver_grass_strips",
+      "target": "infiltration_rate",
+      "key": 0
+    },
+    {
+      "edge": {
+        "source": "vetiver_grass_strips",
+        "target": "aggregate_stability",
+        "sign": "+",
+        "effect": {
+          "family": "lognormal",
+          "ci_low": 0.01,
+          "ci_high": 0.08,
+          "ci_level": 0.95,
+          "point": null
+        },
+        "metric": "percent_change",
+        "lag_years": [
+          1.0,
+          4.0
+        ],
+        "conditions": {
+          "rainfall_mm": null,
+          "soc_pct": null,
+          "ph": null,
+          "clay_pct": null,
+          "slope_pct": [
+            3.0,
+            40.0
+          ],
+          "land_use": null,
+          "climate_zone": null
+        },
+        "evidence": [
+          {
+            "source_id": "FAO_2017_VGSSM",
+            "role": "primary",
+            "pages": null,
+            "chunk_ids": null,
+            "quote": null,
+            "note": "Supports direction only (dense perennial root systems bind soil and vegetative barriers retain fines on the field). The interval is an own estimate, not a published figure."
+          }
+        ],
+        "strength": "mechanistic",
+        "confidence": "low",
+        "mechanism": "Dense perennial vetiver roots bind soil particles and exude organic compounds that hold aggregates together, while the hedge traps the fine, carbon-rich particles that runoff would otherwise carry away first. Keeping those fines on the field leaves the material aggregates are built from where it can be rebuilt. Slower than the erosion effect at 1-4 years, because it depends on root establishment rather than on the barrier standing up. Gated on slope 3-40%. Own judgement, not a published threshold.",
+        "contested": false,
+        "contested_note": null
+      },
+      "source": "vetiver_grass_strips",
+      "target": "aggregate_stability",
+      "key": 0
+    },
+    {
+      "edge": {
+        "source": "vetiver_grass_strips",
+        "target": "structural_heterogeneity",
+        "sign": "+",
+        "effect": {
+          "family": "lognormal",
+          "ci_low": 0.01,
+          "ci_high": 0.08,
+          "ci_level": 0.95,
+          "point": null
+        },
+        "metric": "percent_change",
+        "lag_years": [
+          1.0,
+          4.0
+        ],
+        "conditions": {
+          "rainfall_mm": null,
+          "soc_pct": null,
+          "ph": null,
+          "clay_pct": null,
+          "slope_pct": [
+            3.0,
+            40.0
+          ],
+          "land_use": null,
+          "climate_zone": null
+        },
+        "evidence": [
+          {
+            "source_id": "IPBES_2018_LDR",
+            "role": "primary",
+            "pages": null,
+            "chunk_ids": null,
+            "quote": null,
+            "note": "Supports direction only (permanent vegetation strips add structural variation to otherwise uniform cropland). The interval is an own estimate, not a published figure."
+          }
+        ],
+        "strength": "mechanistic",
+        "confidence": "low",
+        "mechanism": "Permanent grass strips introduce undisturbed, structurally distinct vegetation into a field that is otherwise uniform and tilled on one cycle, adding within-field variation in vegetation height and density and cover that persists across the fallow. Smaller in effect than a woody hedgerow, which adds a vertical layer a grass strip does not. Gated on slope 3-40%, since the strips are sited where contour barriers are worth installing. Own judgement, not a published threshold.",
+        "contested": false,
+        "contested_note": null
+      },
+      "source": "vetiver_grass_strips",
+      "target": "structural_heterogeneity",
+      "key": 0
+    },
+    {
+      "edge": {
         "source": "rotational_grazing",
         "target": "canopy_cover",
         "sign": "+",

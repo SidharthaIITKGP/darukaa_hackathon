@@ -1,5 +1,7 @@
 """The LangGraph state machine, its checkpointer, and a replayable demo.
 
+    intake -> smalltalk    when the message is a greeting or meta question
+    smalltalk -> END
     intake -> acquire -> gap_analysis
     gap_analysis -> ask        when a question is due; ask interrupts
     ask -> intake              the answer re-enters as a user message
@@ -41,6 +43,7 @@ from src.agents.nodes import (
     intake_node,
     needs_revision,
     plan_node,
+    smalltalk_node,
     synthesise_node,
 )
 from src.agents.state import Claim, ConversationState, initial_state
@@ -115,6 +118,16 @@ def ask_node(state: ConversationState) -> dict:
     }
 
 
+def _after_intake(state: ConversationState) -> str:
+    """Greetings and meta questions skip the pipeline entirely.
+
+    intake has already parsed the message by this point, and it sets the
+    reply only when nothing measurable came out of it, so this cannot divert
+    a turn that carried site data.
+    """
+    return "smalltalk" if state.get("smalltalk_reply") else "acquire"
+
+
 def _after_gap_analysis(state: ConversationState) -> str:
     return "ask" if state.get("pending_question") else "diagnose"
 
@@ -137,6 +150,7 @@ def build_agent_graph(checkpointer: MemorySaver | None = None):
     builder = StateGraph(ConversationState)
 
     builder.add_node("intake", intake_node)
+    builder.add_node("smalltalk", smalltalk_node)
     builder.add_node("acquire", acquire_node)
     builder.add_node("gap_analysis", gap_analysis_node)
     builder.add_node("ask", ask_node)
@@ -148,7 +162,10 @@ def build_agent_graph(checkpointer: MemorySaver | None = None):
     builder.add_node("critic", critic_node)
 
     builder.set_entry_point("intake")
-    builder.add_edge("intake", "acquire")
+    builder.add_conditional_edges(
+        "intake", _after_intake, {"smalltalk": "smalltalk", "acquire": "acquire"}
+    )
+    builder.add_edge("smalltalk", END)
     builder.add_edge("acquire", "gap_analysis")
     builder.add_conditional_edges(
         "gap_analysis", _after_gap_analysis, {"ask": "ask", "diagnose": "diagnose"}

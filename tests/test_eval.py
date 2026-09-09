@@ -276,11 +276,17 @@ def test_baseline_citations_split_into_resolved_and_unverifiable() -> None:
 @pytest.mark.slow
 @pytest.mark.xfail(
     reason=(
-        "Known gap: vetiver_grass_strips has only one outgoing edge, to "
-        "erosion_rate, so on eval_steep_humid its justification rests on a "
-        "single variable and misses the brief's floor of three. The fix is "
-        "more outgoing edges from that node (infiltration_rate and "
-        "aggregate_stability are the obvious two), not a change to the test."
+        "Known gap, narrowed. vetiver_grass_strips is fixed: it now carries three "
+        "mechanistic edges beyond erosion and reaches nine variables, covered by "
+        "test_vetiver_justification_clears_the_three_variable_floor. What remains is "
+        "compost_application, whose single edge points at soil_ph, and soil_ph is a "
+        "terminal node with no outgoing edges, so that recommendation can only ever "
+        "reach one variable. The fix is either more outgoing edges from "
+        "compost_application (soil_organic_carbon, microbial_biomass_carbon and "
+        "nitrogen_availability are the candidates) or outgoing edges from soil_ph, and "
+        "both are domain judgements about what the evidence supports rather than "
+        "changes to this test. Nine other interventions have a single outgoing edge and "
+        "clear the floor by cascading, so out-degree alone is not the criterion."
     ),
     strict=False,
 )

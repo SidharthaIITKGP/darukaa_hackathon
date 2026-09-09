@@ -617,6 +617,60 @@ def llm_top_up(text: str, parsed: ParsedIntake, unknown: Iterable[str]) -> list[
     return accepted
 
 
+# Conversational openers and meta questions. Matched only when the same
+# message parsed to no site fields at all, so "hi, soil carbon is 0.4%" is
+# treated as data and not as a greeting.
+_SMALLTALK_RE = re.compile(
+    r"^\W*(?:"
+    r"hi|hey|hello|yo|hiya|greetings|namaste|"
+    r"good\s+(?:morning|afternoon|evening|day)|"
+    r"thanks|thank\s+you|thx|ta|cheers|"
+    r"ok|okay|cool|nice|great|"
+    r"who\s+are\s+you|what\s+are\s+you|"
+    r"what\s+(?:can|do)\s+you\s+do|what\s+is\s+this|how\s+does\s+this\s+work|"
+    r"how\s+are\s+you|how\s+do\s+you\s+work|"
+    r"help|start|test(?:ing)?"
+    r")\b[\s\S]{0,40}$",
+    re.IGNORECASE,
+)
+
+# What the system needs before it can diagnose anything. Named in the reply
+# so a first-time user is told what to type rather than left to guess.
+_WANTED = "soil organic carbon, annual rainfall, land use, and coordinates if you have them"
+
+
+def is_smalltalk(text: str) -> bool:
+    """Whether a message is a greeting or a meta question rather than site data.
+
+    Length-bounded on purpose. A long message that happens to open with
+    "hi" is a description of a site, and running it through here would drop
+    the description on the floor.
+    """
+    return bool(_SMALLTALK_RE.match(text.strip()))
+
+
+def smalltalk_response(site: SiteState) -> str:
+    """A short conversational reply. No diagnosis, no propagation.
+
+    Two branches, because the useful answer differs. With nothing known the
+    reply has to say what to provide; with a site already loaded, repeating
+    that would be ignoring what the user already told us, so it says what is
+    on file and offers to carry on.
+    """
+    known = site.known()
+    if not known:
+        return (
+            "I am an environmental scientist for land degradation. Tell me about your "
+            "land and I will diagnose what is limiting it and recommend interventions, "
+            f"each with a quantified effect and a citation. Useful to know: {_WANTED}."
+        )
+    have = ", ".join(_label_fields(known))
+    return (
+        f"Still here, and I have your site on file: {have}. Ask me anything about it, "
+        "add a measurement to sharpen the analysis, or say what you would like to do next."
+    )
+
+
 def intake_node(state: ConversationState) -> dict[str, Any]:
     """Parse the newest user message into SiteState updates.
 
@@ -690,8 +744,15 @@ def intake_node(state: ConversationState) -> dict[str, Any]:
     inconsistencies = [note for note in implausible_combinations(updated) if note not in asked]
     notes.extend(inconsistencies)
 
+    # Short-circuit only when the message carried no site data whatsoever.
+    # Parsing runs first and its result is what decides, so a greeting with a
+    # measurement attached is data and reaches the full pipeline.
+    nothing_parsed = not parsed.measurements and parsed.lat is None and parsed.crop is None
+    smalltalk = bool(text) and nothing_parsed and is_smalltalk(text)
+
     update: dict[str, Any] = {
         "site": updated,
+        "smalltalk_reply": smalltalk_response(updated) if smalltalk else None,
         "turn": state.get("turn", 0) + 1,
         "site_history": [previous],
         "revised_fields": pending_revisions,
@@ -1611,6 +1672,18 @@ def grounding_coverage(claims: list[Claim]) -> float:
         return 1.0
     grounded = [c for c in scored if c.category in ("traceable", "entailed")]
     return len(grounded) / len(scored)
+
+
+def smalltalk_node(state: ConversationState) -> dict[str, Any]:
+    """Answer a greeting and stop.
+
+    Deliberately a terminal node rather than a branch inside synthesise. The
+    reply is not a report: it carries no claim, no figure and no citation, so
+    there is nothing for bind, the critic or the methodology footer to do
+    with it, and routing around them is what keeps a "hi" from costing a full
+    propagation run.
+    """
+    return {"draft": state.get("smalltalk_reply") or "", "smalltalk_reply": None}
 
 
 CRITIC_DISABLED_NOTE = (
